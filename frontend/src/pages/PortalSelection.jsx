@@ -7,13 +7,13 @@ export default function PortalSelection() {
   const navigate = useNavigate();
   
   const portals = [
-    { 
-      id: 'admin', 
-      title: 'Admin Portal', 
-      desc: 'Manage employees, departments, payroll, and system configurations.', 
-      icon: Shield,
-      iconColor: 'text-teal-700'
-    },
+    // { 
+    //   id: 'admin', 
+    //   title: 'Admin Portal', 
+    //   desc: 'Manage employees, departments, payroll, and system configurations.', 
+    //   icon: Shield,
+    //   iconColor: 'text-teal-700'
+    // },
     { 
       id: 'hospital', 
       title: 'Hospital Portal', 

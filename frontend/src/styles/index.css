@@ -1,0 +1,408 @@
+@import "tailwindcss";
+
+:root {
+  --sj-bg: #f7f9fb;
+  --sj-surface: #ffffff;
+  --sj-surface-2: #f1f5f8;
+
+  --sj-text: #10212b;
+  --sj-text-soft: #5d6d76;
+  --sj-text-muted: #87949c;
+
+  --sj-border: #dfe6ea;
+
+  --sj-primary: #008f72;
+  --sj-primary-dark: #00745d;
+  --sj-primary-soft: #e5f5f0;
+
+  --sj-navy: #102a36;
+
+  --sj-map-bg: #edf3f4;
+  --sj-map-line: #d5e0e2;
+
+  --sj-shadow:
+    0 10px 35px rgba(16, 42, 54, 0.07);
+}
+
+html.dark {
+  --sj-bg: #0b1419;
+  --sj-surface: #111d23;
+  --sj-surface-2: #17252c;
+
+  --sj-text: #edf4f6;
+  --sj-text-soft: #a8b7be;
+  --sj-text-muted: #71838c;
+
+  --sj-border: #263840;
+
+  --sj-primary: #14b894;
+  --sj-primary-dark: #0f9d7e;
+  --sj-primary-soft: #123c34;
+
+  --sj-navy: #081319;
+
+  --sj-map-bg: #101c21;
+  --sj-map-line: #1e3037;
+
+  --sj-shadow:
+    0 16px 45px rgba(0, 0, 0, 0.25);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--sj-bg);
+  color: var(--sj-text);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+}
+
+a {
+  text-decoration: none;
+}
+
+::selection {
+  background: var(--sj-primary);
+  color: white;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--sj-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--sj-border);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sj-text-muted);
+}
+
+/* =========================================================
+   PAGE FOUNDATION
+========================================================= */
+
+.sanjeevani-page {
+  background:
+    radial-gradient(
+      circle at 50% -10%,
+      color-mix(in srgb, var(--sj-primary) 5%, transparent),
+      transparent 32rem
+    ),
+    var(--sj-bg);
+  color: var(--sj-text);
+}
+
+/* =========================================================
+   COMMON CARDS
+========================================================= */
+
+.sj-card {
+  border: 1px solid var(--sj-border);
+  border-radius: 1.25rem;
+  background: var(--sj-surface);
+  box-shadow: var(--sj-shadow);
+}
+
+.sj-card-hover {
+  border: 1px solid var(--sj-border);
+  border-radius: 1.25rem;
+  background: var(--sj-surface);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.sj-card-hover:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--sj-primary) 30%, var(--sj-border));
+  box-shadow: var(--sj-shadow);
+}
+
+/* =========================================================
+   INPUTS
+========================================================= */
+
+.sj-label {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--sj-text);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.sj-input {
+  width: 100%;
+  border: 1px solid var(--sj-border);
+  border-radius: 0.75rem;
+  background: var(--sj-surface);
+  color: var(--sj-text);
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.sj-input::placeholder {
+  color: var(--sj-text-muted);
+}
+
+.sj-input:focus {
+  border-color: var(--sj-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sj-primary) 12%, transparent);
+}
+
+/* =========================================================
+   SECTION TYPOGRAPHY
+========================================================= */
+
+.sj-section-title {
+  color: var(--sj-text);
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.sj-section-description {
+  color: var(--sj-text-soft);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+/* =========================================================
+   STATUS
+========================================================= */
+
+.sj-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.sj-status-success {
+  background: color-mix(in srgb, #10b981 12%, transparent);
+  color: #059669;
+}
+
+.sj-status-warning {
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+  color: #d97706;
+}
+
+.sj-status-danger {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  color: #dc2626;
+}
+
+.sj-status-info {
+  background: color-mix(in srgb, #3b82f6 12%, transparent);
+  color: #2563eb;
+}
+
+/* =========================================================
+   LIVE INDICATORS
+========================================================= */
+
+.sj-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.sj-live-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+  animation: sj-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes sj-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.55;
+    transform: scale(0.8);
+  }
+}
+
+/* =========================================================
+   MAP
+========================================================= */
+
+.sj-map {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--sj-border);
+  border-radius: 1.25rem;
+  background: var(--sj-map-bg);
+}
+
+.sj-map-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(
+      to right,
+      var(--sj-map-line) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      var(--sj-map-line) 1px,
+      transparent 1px
+    );
+  background-size: 36px 36px;
+  opacity: 0.65;
+}
+
+/* =========================================================
+   SOS
+========================================================= */
+
+.sj-sos-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 4rem;
+  padding: 0 1.5rem;
+  border: 0;
+  border-radius: 1rem;
+  background: #dc2626;
+  color: white;
+  font-weight: 900;
+  box-shadow:
+    0 12px 30px rgba(220, 38, 38, 0.2),
+    0 0 0 6px rgba(220, 38, 38, 0.07);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.sj-sos-button:hover {
+  transform: translateY(-2px);
+  background: #b91c1c;
+  box-shadow:
+    0 16px 35px rgba(220, 38, 38, 0.25),
+    0 0 0 8px rgba(220, 38, 38, 0.08);
+}
+
+.sj-sos-button:active {
+  transform: translateY(0);
+}
+
+/* =========================================================
+   AI BUTTON
+========================================================= */
+
+.sj-ai-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  background: var(--sj-primary);
+  color: white;
+  font-weight: 800;
+  transition:
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.sj-ai-button:hover {
+  transform: translateY(-1px);
+  background: var(--sj-primary-dark);
+}
+
+/* =========================================================
+   GLASS
+========================================================= */
+
+.sj-glass {
+  border: 1px solid color-mix(in srgb, var(--sj-border) 80%, transparent);
+  background: color-mix(in srgb, var(--sj-surface) 82%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+/* =========================================================
+   ACCESSIBILITY
+========================================================= */
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--sj-primary) 30%, transparent);
+  outline-offset: 2px;
+}
+
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 640px) {
+  .sj-card {
+    border-radius: 1rem;
+  }
+
+  .sj-map {
+    border-radius: 1rem;
+  }
+}

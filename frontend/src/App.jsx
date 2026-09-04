@@ -1,58 +1,191 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import HomePage from './pages/home/HomePage';
+import PatientLogin from './pages/auth/PatientLogin';
+import PatientRegister from './pages/auth/PatientRegister';
+import PatientProfileSetup from './pages/auth/PatientProfileSetup';
+import PatientDashboard from './pages/patient/PatientDashboard';
+import EmergencyPage from './pages/patient/EmergencyPage';
+import TrackingPage from './pages/patient/TrackingPage';
+import MedicalProfile from './pages/patient/MedicalProfile';
+import EmergencyContacts from './pages/patient/EmergencyContacts';
+import EmergencyHistory from './pages/patient/EmergencyHistory';
 
-import PortalSelection from './pages/PortalSelection';
-import LoginView from './pages/LoginView';
-import RegisterView from './pages/RegisterView';
+function AuthPlaceholder({ title, description }) {
+  return (
+    <div className="sanjeevani-page flex min-h-screen items-center justify-center p-6">
+      <div className="sj-card w-full max-w-md p-8">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-(--sj-primary)">
+          Sanjeevani AI
+        </p>
 
-import PatientDashboard from './pages/PatientDashboard';
-import HospitalDashboard from './pages/HospitalDashboard';
-import AdminDashboard from './pages/AdminDashboard';
+        <h1 className="mt-3 text-2xl font-extrabold text-(--sj-text)">
+          {title}
+        </h1>
+
+        <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function DashboardPlaceholder({ title }) {
+  return (
+    <div className="sanjeevani-page flex min-h-screen items-center justify-center p-6">
+      <div className="sj-card w-full max-w-xl p-8">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-(--sj-primary)">
+          Dashboard
+        </p>
+
+        <h1 className="mt-3 text-2xl font-extrabold text-(--sj-text)">
+          {title}
+        </h1>
+
+        <p className="mt-2 text-sm leading-6 text-  (--sj-text-soft)">
+          This dashboard will be built in the next frontend phase.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Landing / Portal Selection */}
-          <Route
-            path="/"
-            element={<PortalSelection />}
-          />
+    <BrowserRouter>
+      <Routes>
+        {/* =====================================================
+            PUBLIC
+        ===================================================== */}
 
-          {/* Authentication */}
-          <Route
-            path="/login/:role"
-            element={<LoginView />}
-          />
+        <Route path="/" element={<HomePage />} />
 
-          <Route
-            path="/register/:role"
-            element={<RegisterView />}
-          />
+        {/* =====================================================
+            PATIENT AUTHENTICATION
+        ===================================================== */}
 
-          {/* Patient Portal */}
-          <Route
-            path="/dashboard/patient"
-            element={<PatientDashboard />}
-          />
+        <Route
+          path="/login/patient"
+          element={<PatientLogin />}
+        />
 
-          {/* Hospital Portal */}
-          <Route
-            path="/dashboard/hospital"
-            element={<HospitalDashboard />}
-          />
+        <Route
+          path="/register/patient"
+          element={<PatientRegister />
+          }
+        />
+        <Route
+          path="/register/patient/profile"
+          element={<PatientProfileSetup />}
+        />
 
-          {/* Admin Portal
-              Keep this route for future admin development.
-              Do not expose it from the normal portal UI. */}
-          <Route
-            path="/dashboard/admin"
-            element={<AdminDashboard />}
-          />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+
+
+        {/* =====================================================
+            HOSPITAL ADMIN AUTHENTICATION
+        ===================================================== */}
+
+        <Route
+          path="/login/hospital-admin"
+          element={
+            <AuthPlaceholder
+              title="Hospital Admin Login"
+              description="Access your hospital's emergency coordination center."
+            />
+          }
+        />
+
+        <Route
+          path="/register/hospital-admin"
+          element={
+            <AuthPlaceholder
+              title="Hospital Admin Registration"
+              description="Register your hospital and create its administrator account."
+            />
+          }
+        />
+
+        {/* =====================================================
+            PARAMEDIC AUTHENTICATION
+            No public registration route.
+        ===================================================== */}
+
+        <Route
+          path="/login/paramedic"
+          element={
+            <AuthPlaceholder
+              title="Paramedic Login"
+              description="Secure operational access for authorized Sanjeevani AI paramedics."
+            />
+          }
+        />
+
+        {/* =====================================================
+            PATIENT DASHBOARD
+        ===================================================== */}
+
+        <Route
+          path="/dashboard/patient"
+          element={<PatientDashboard />}
+        />
+
+        <Route
+          path="/dashboard/patient/emergency"
+          element={<EmergencyPage />}
+        />
+
+        <Route
+          path="/dashboard/patient/medical-profile"
+          element={<MedicalProfile />}
+        />
+
+        <Route
+          path="/dashboard/patient/tracking"
+          element={<TrackingPage />}
+        />
+
+        <Route
+          path="/dashboard/patient/emergency-contacts"
+          element={<EmergencyContacts />}
+        />
+
+        <Route
+          path="/dashboard/patient/history"
+          element={<EmergencyHistory />}
+        />
+
+        {/* =====================================================
+            HOSPITAL ADMIN DASHBOARD
+        ===================================================== */}
+
+        <Route
+          path="/dashboard/hospital"
+          element={
+            <DashboardPlaceholder title="Hospital Admin Dashboard" />
+          }
+        />
+
+        {/* =====================================================
+            PARAMEDIC DASHBOARD
+        ===================================================== */}
+
+        <Route
+          path="/dashboard/paramedic"
+          element={
+            <DashboardPlaceholder title="Paramedic Dashboard" />
+          }
+        />
+
+        {/* =====================================================
+            FALLBACK
+        ===================================================== */}
+
+        <Route
+          path="*"
+          element={<Navigate to="/" replace />}
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }

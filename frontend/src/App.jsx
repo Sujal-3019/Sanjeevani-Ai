@@ -11,6 +11,7 @@ import MedicalProfile from './pages/patient/MedicalProfile';
 import EmergencyContacts from './pages/patient/EmergencyContacts';
 import EmergencyHistory from './pages/patient/EmergencyHistory';
 import HospitalAdminLogin from './pages/auth/HospitalAdminLogin';
+import HospitalAdminRegister from './pages/auth/HospitalAdminRegister';
 
 
 function AuthPlaceholder({ title, description }) {
@@ -97,10 +98,7 @@ export default function App() {
         <Route
           path="/register/hospital-admin"
           element={
-            <AuthPlaceholder
-              title="Hospital Admin Registration"
-              description="Register your hospital and create its administrator account."
-            />
+            < HospitalAdminRegister/>
           }
         />
 

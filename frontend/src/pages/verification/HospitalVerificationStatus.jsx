@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
     ArrowLeft,
     Building2,
@@ -12,7 +12,7 @@ import {
     ShieldCheck,
     XCircle,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import AuthLayout from '../../layouts/AuthLayout';
 
@@ -31,18 +31,21 @@ const STATUS_CONFIG = {
             'Your application has been submitted successfully and is waiting for review by the Sanjeevani AI verification team.',
         icon: Clock3,
     },
+
     UNDER_REVIEW: {
         label: 'Under Review',
         description:
             'The Sanjeevani AI verification team is currently reviewing your hospital information.',
         icon: FileCheck2,
     },
+
     VERIFIED: {
         label: 'Verified',
         description:
             'Your hospital has been successfully verified and can participate in Sanjeevani AI emergency coordination.',
         icon: CheckCircle2,
     },
+
     REJECTED: {
         label: 'Rejected',
         description:
@@ -51,209 +54,330 @@ const STATUS_CONFIG = {
     },
 };
 
+const TIMELINE_STEPS = [
+    {
+        key: 'SUBMITTED',
+        label: 'Application submitted',
+        description: 'Hospital information was submitted successfully.',
+    },
+    {
+        key: 'UNDER_REVIEW',
+        label: 'Verification review',
+        description: 'The Sanjeevani AI team checks the submitted information.',
+    },
+    {
+        key: 'VERIFIED',
+        label: 'Verification decision',
+        description: 'Your hospital is approved or the application is returned for correction.',
+    },
+];
+
+function getStatusStepIndex(status) {
+    if (status === 'PENDING') {
+        return 0;
+    }
+
+    if (status === 'UNDER_REVIEW') {
+        return 1;
+    }
+
+    if (status === 'VERIFIED') {
+        return 2;
+    }
+
+    if (status === 'REJECTED') {
+        return 2;
+    }
+
+    return 0;
+}
+
+function getStoredApplications() {
+    try {
+        const stored = localStorage.getItem('sanjeevani_hospital_verification');
+
+        if (!stored) {
+            return [];
+        }
+
+        const parsed = JSON.parse(stored);
+
+        if (Array.isArray(parsed)) {
+            return parsed;
+        }
+
+        if (parsed && typeof parsed === 'object') {
+            return [parsed];
+        }
+
+        return [];
+    } catch {
+        return [];
+    }
+}
+
 function HospitalVerificationStatus() {
-    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
-    const savedApplication = localStorage.getItem(
-        'sanjeevani_hospital_verification',
-    );
+    const applicationIdFromUrl = (
+        searchParams.get('applicationId') || ''
+    ).trim().toUpperCase();
 
-    const application = savedApplication
-        ? JSON.parse(savedApplication)
-        : MOCK_APPLICATION;
+    const [refreshKey, setRefreshKey] = React.useState(0);
 
-    const statusConfig =
-        STATUS_CONFIG[application.status] || STATUS_CONFIG.PENDING;
+    const application = React.useMemo(() => {
+        const applications = getStoredApplications();
 
+        if (!applicationIdFromUrl) {
+            return applications[0] || MOCK_APPLICATION;
+        }
+
+        const matchingApplication = applications.find(
+            (item) =>
+                String(item.applicationId || '').toUpperCase() ===
+                applicationIdFromUrl,
+        );
+
+        return matchingApplication || null;
+    }, [applicationIdFromUrl, refreshKey]);
+
+    const status = application?.status || 'PENDING';
+    const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG.PENDING;
     const StatusIcon = statusConfig.icon;
-
-    const steps = [
-        {
-            key: 'submitted',
-            title: 'Application submitted',
-            description:
-                'Your hospital profile has been successfully submitted.',
-            completed: true,
-        },
-        {
-            key: 'review',
-            title: 'Verification review',
-            description:
-                'The Sanjeevani AI team reviews your hospital information.',
-            completed:
-                application.status === 'UNDER_REVIEW' ||
-                application.status === 'VERIFIED',
-            active:
-                application.status === 'PENDING' ||
-                application.status === 'UNDER_REVIEW',
-        },
-        {
-            key: 'decision',
-            title:
-                application.status === 'REJECTED'
-                    ? 'Application decision'
-                    : 'Verification decision',
-            description:
-                application.status === 'REJECTED'
-                    ? 'The application requires changes before it can be approved.'
-                    : 'Your hospital will be approved once verification is complete.',
-            completed: application.status === 'VERIFIED',
-            rejected: application.status === 'REJECTED',
-        },
-    ];
-
-    const statusBadgeClass = useMemo(() => {
-        if (application.status === 'VERIFIED') {
-            return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
-        }
-
-        if (application.status === 'REJECTED') {
-            return 'border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400';
-        }
-
-        if (application.status === 'UNDER_REVIEW') {
-            return 'border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400';
-        }
-
-        return 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400';
-    }, [application.status]);
+    const activeStepIndex = getStatusStepIndex(status);
 
     const handleRefresh = () => {
-        /*
-         * Mock behavior for now.
-         *
-         * Later this button will call the backend:
-         *
-         * GET /api/hospitals/verification-status
-         *
-         * and update the application status from the response.
-         */
-        window.location.reload();
+        setRefreshKey((value) => value + 1);
     };
+
+    const handleResubmit = () => {
+        window.location.href = '/register/hospital-admin/profile';
+    };
+
+    if (!application) {
+        return (
+            <AuthLayout
+                eyebrow="Hospital verification"
+                title="Application not found"
+                description="We could not find a hospital verification application matching the application ID you entered."
+            >
+                <div className="text-center">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/10 text-red-500">
+                        <Info className="h-7 w-7" />
+                    </div>
+
+                    <h2 className="mt-6 text-xl font-black text-(--sj-text)">
+                        No matching application
+                    </h2>
+
+                    <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-(--sj-text-soft)">
+                        Please check your application ID and try again. The application ID
+                        usually looks like HSP-2026-00421.
+                    </p>
+
+                    {applicationIdFromUrl && (
+                        <div className="mt-5 rounded-xl border border-(--sj-border) bg-(--sj-bg) px-4 py-3">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-(--sj-text-muted)">
+                                Application ID searched
+                            </p>
+
+                            <p className="mt-1 text-sm font-black tracking-wide text-(--sj-text)">
+                                {applicationIdFromUrl}
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                        <Link
+                            to="/"
+                            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-(--sj-border) px-5 text-sm font-bold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            Back to home
+                        </Link>
+
+                        <Link
+                            to="/register/hospital-admin"
+                            className="sj-ai-button h-11 px-5"
+                        >
+                            Register hospital
+                        </Link>
+                    </div>
+                </div>
+            </AuthLayout>
+        );
+    }
 
     return (
         <AuthLayout
             eyebrow="Hospital verification"
-            title="Track your verification status."
-            description="Your hospital application is being reviewed by the Sanjeevani AI verification team. You can return to this page anytime to check its current status."
+            title="Track your hospital application"
+            description="Use your application ID to follow the verification progress of your hospital registration."
         >
-            <div className="space-y-6">
-                <Link
-                    to="/"
-                    className="inline-flex items-center gap-2 text-sm font-bold text-(--sj-text-soft) transition hover:text-(--sj-text)"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to home
-                </Link>
-
-                <div className="rounded-2xl border border-(--sj-border) bg-(--sj-surface-2) p-5">
-                    <div className="flex items-start gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-(--sj-primary)/10 text-(--sj-primary)">
+            <div>
+                {/* Header */}
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-(--sj-primary)/10 text-(--sj-primary)">
                             <Building2 className="h-6 w-6" />
                         </div>
 
-                        <div className="min-w-0 flex-1">
-                            <p className="text-xs font-black uppercase tracking-[0.15em] text-(--sj-text-muted)">
-                                Hospital application
-                            </p>
-
-                            <h2 className="mt-1 truncate text-base font-black text-(--sj-text)">
-                                {application.hospitalName}
-                            </h2>
-
-                            <p className="mt-1 text-xs text-(--sj-text-muted)">
-                                Application ID: {application.applicationId}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="rounded-2xl border border-(--sj-border) bg-(--sj-surface) p-5 shadow-sm">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-3">
-                            <div
-                                className={`flex h-11 w-11 items-center justify-center rounded-xl border ${statusBadgeClass}`}
-                            >
-                                <StatusIcon className="h-5 w-5" />
-                            </div>
-
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-[0.14em] text-(--sj-text-muted)">
-                                    Current status
-                                </p>
-
-                                <p className="mt-1 text-lg font-black text-(--sj-text)">
-                                    {statusConfig.label}
-                                </p>
-                            </div>
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={handleRefresh}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-(--sj-border) bg-(--sj-surface) px-4 py-2.5 text-sm font-bold text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-text)"
-                        >
-                            <RefreshCw className="h-4 w-4" />
-                            Check status
-                        </button>
-                    </div>
-
-                    <div className="mt-5 rounded-xl border border-(--sj-border) bg-(--sj-surface-2) p-4">
-                        <p className="text-sm leading-6 text-(--sj-text-soft)">
-                            {statusConfig.description}
-                        </p>
-                    </div>
-                </div>
-
-                <div>
-                    <div className="mb-4">
-                        <h2 className="text-base font-black text-(--sj-text)">
-                            Verification progress
+                        <h2 className="mt-5 text-xl font-black text-(--sj-text)">
+                            {application.hospitalName}
                         </h2>
 
                         <p className="mt-1 text-sm text-(--sj-text-soft)">
-                            Follow the progress of your hospital application.
+                            Hospital verification application
                         </p>
                     </div>
 
-                    <div className="space-y-0">
-                        {steps.map((step, index) => {
-                            const isLast = index === steps.length - 1;
+                    <button
+                        type="button"
+                        onClick={handleRefresh}
+                        aria-label="Refresh application status"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-(--sj-border) bg-(--sj-surface) text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-primary)"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                    </button>
+                </div>
+
+                {/* Status */}
+                <div className="mt-7 rounded-2xl border border-(--sj-border) bg-(--sj-bg) p-5">
+                    <div className="flex items-start gap-4">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-(--sj-primary)/10 text-(--sj-primary)">
+                            <StatusIcon className="h-5 w-5" />
+                        </div>
+
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-base font-black text-(--sj-text)">
+                                    {statusConfig.label}
+                                </h3>
+
+                                <span
+                                    className={`sj-status ${
+                                        status === 'VERIFIED'
+                                            ? 'sj-status-success'
+                                            : status === 'REJECTED'
+                                                ? 'sj-status-danger'
+                                                : status === 'UNDER_REVIEW'
+                                                    ? 'sj-status-info'
+                                                    : 'sj-status-warning'
+                                    }`}
+                                >
+                                    {statusConfig.label}
+                                </span>
+                            </div>
+
+                            <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
+                                {statusConfig.description}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Application information */}
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-(--sj-border) bg-(--sj-surface) p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-(--sj-text-muted)">
+                            Application ID
+                        </p>
+
+                        <p className="mt-2 text-sm font-black tracking-wide text-(--sj-text)">
+                            {application.applicationId}
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-(--sj-border) bg-(--sj-surface) p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-(--sj-text-muted)">
+                            Submitted
+                        </p>
+
+                        <p className="mt-2 text-sm font-bold text-(--sj-text)">
+                            {application.submittedAt}
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-(--sj-border) bg-(--sj-surface) p-4 sm:col-span-2">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-(--sj-text-muted)">
+                            Last updated
+                        </p>
+
+                        <p className="mt-2 text-sm font-bold text-(--sj-text)">
+                            {application.lastUpdated}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Timeline */}
+                <div className="mt-7">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-black text-(--sj-text)">
+                            Verification progress
+                        </h3>
+
+                        <span className="text-xs font-semibold text-(--sj-text-muted)">
+                            {statusConfig.label}
+                        </span>
+                    </div>
+
+                    <div className="mt-5 space-y-0">
+                        {TIMELINE_STEPS.map((step, index) => {
+                            const isComplete = index < activeStepIndex;
+                            const isCurrent =
+                                index === activeStepIndex &&
+                                status !== 'VERIFIED' &&
+                                status !== 'REJECTED';
+
+                            const isFinal =
+                                index === 2 &&
+                                (status === 'VERIFIED' || status === 'REJECTED');
 
                             return (
                                 <div
                                     key={step.key}
-                                    className="relative flex gap-4"
+                                    className="relative flex gap-4 pb-6 last:pb-0"
                                 >
-                                    {!isLast && (
-                                        <div className="absolute left-3.75 top-8 h-[calc(100%-8px)] w-px bg-(--sj-border)" />
+                                    {index !== TIMELINE_STEPS.length - 1 && (
+                                        <div
+                                            className={`absolute left-4 top-9 h-[calc(100%-1rem)] w-px ${
+                                                isComplete || isFinal
+                                                    ? 'bg-(--sj-primary)'
+                                                    : 'bg-(--sj-border)'
+                                            }`}
+                                        />
                                     )}
 
-                                    <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-(--sj-border) bg-(--sj-surface)">
-                                        {step.completed ? (
-                                            <div className="flex h-full w-full items-center justify-center rounded-full bg-(--sj-primary) text-white">
-                                                <Check className="h-4 w-4" />
-                                            </div>
-                                        ) : step.rejected ? (
-                                            <div className="flex h-full w-full items-center justify-center rounded-full bg-red-500 text-white">
-                                                <XCircle className="h-4 w-4" />
-                                            </div>
-                                        ) : step.active ? (
-                                            <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                                    <div
+                                        className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
+                                            isComplete || isFinal
+                                                ? 'border-(--sj-primary) bg-(--sj-primary) text-white'
+                                                : isCurrent
+                                                    ? 'border-(--sj-primary) bg-(--sj-primary)/10 text-(--sj-primary)'
+                                                    : 'border-(--sj-border) bg-(--sj-surface) text-(--sj-text-muted)'
+                                        }`}
+                                    >
+                                        {isComplete || isFinal ? (
+                                            <Check className="h-4 w-4" />
                                         ) : (
-                                            <div className="h-2 w-2 rounded-full bg-(--sj-border)" />
+                                            <span className="text-[11px] font-black">
+                                                {index + 1}
+                                            </span>
                                         )}
                                     </div>
 
-                                    <div
-                                        className={`pb-7 ${isLast ? 'pb-0' : ''
+                                    <div className="pt-0.5">
+                                        <p
+                                            className={`text-sm font-black ${
+                                                isCurrent
+                                                    ? 'text-(--sj-primary)'
+                                                    : 'text-(--sj-text)'
                                             }`}
-                                    >
-                                        <p className="text-sm font-black text-(--sj-text)">
-                                            {step.title}
+                                        >
+                                            {step.label}
                                         </p>
 
-                                        <p className="mt-1 text-sm leading-6 text-(--sj-text-soft)">
+                                        <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
                                             {step.description}
                                         </p>
                                     </div>
@@ -263,90 +387,98 @@ function HospitalVerificationStatus() {
                     </div>
                 </div>
 
-                <div className="rounded-2xl border border-(--sj-border) bg-(--sj-surface-2) p-5">
+                {/* Next steps */}
+                <div className="mt-7 rounded-2xl border border-(--sj-border) bg-(--sj-surface) p-5">
                     <div className="flex items-start gap-3">
-                        <Info className="mt-0.5 h-5 w-5 shrink-0 text-(--sj-primary)" />
+                        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-(--sj-primary)" />
 
                         <div>
-                            <p className="text-sm font-black text-(--sj-text)">
+                            <h3 className="text-sm font-black text-(--sj-text)">
                                 What happens next?
-                            </p>
+                            </h3>
 
-                            <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
-                                The verification team will review your hospital
-                                registration details, services, emergency
-                                capabilities and submitted information. You will
-                                be able to use Sanjeevani AI emergency
-                                coordination features after your hospital is
-                                verified.
-                            </p>
+                            {status === 'PENDING' && (
+                                <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
+                                    Your application is in the verification queue. The
+                                    Sanjeevani AI team will review the hospital information and
+                                    update the application status.
+                                </p>
+                            )}
+
+                            {status === 'UNDER_REVIEW' && (
+                                <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
+                                    The verification team is reviewing your hospital
+                                    registration details. Please check this page again for
+                                    updates.
+                                </p>
+                            )}
+
+                            {status === 'VERIFIED' && (
+                                <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
+                                    Your hospital is verified. You can now access the Hospital
+                                    Admin dashboard and configure your emergency resources.
+                                </p>
+                            )}
+
+                            {status === 'REJECTED' && (
+                                <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
+                                    Review the rejection information provided by the
+                                    verification team, correct the required details and
+                                    resubmit your hospital profile.
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface) p-4">
-                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                            Submitted
-                        </p>
-
-                        <p className="mt-1 text-sm font-bold text-(--sj-text)">
-                            {application.submittedAt}
-                        </p>
-                    </div>
-
-                    <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface) p-4">
-                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                            Last updated
-                        </p>
-
-                        <p className="mt-1 text-sm font-bold text-(--sj-text)">
-                            {application.lastUpdated}
-                        </p>
-                    </div>
-                </div>
-
-                <div className="border-t border-(--sj-border) pt-5">
-                    {application.status === 'VERIFIED' ? (
+                {/* Actions */}
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                    {status === 'VERIFIED' ? (
+                        <Link
+                            to="/dashboard/hospital"
+                            className="sj-ai-button h-11 flex-1 px-5"
+                        >
+                            Continue to dashboard
+                            <ArrowRight className="h-4 w-4" />
+                        </Link>
+                    ) : status === 'REJECTED' ? (
                         <button
                             type="button"
-                            onClick={() =>
-                                navigate('/dashboard/hospital')
-                            }
-                            className="sj-ai-button w-full px-5 py-3.5"
+                            onClick={handleResubmit}
+                            className="sj-ai-button h-11 flex-1 px-5"
                         >
-                            <ShieldCheck className="h-4 w-4" />
-                            Continue to Hospital Dashboard
-                        </button>
-                    ) : application.status === 'REJECTED' ? (
-                        <button
-                            type="button"
-                            onClick={() =>
-                                navigate('/register/hospital-admin/profile')
-                            }
-                            className="sj-ai-button w-full px-5 py-3.5"
-                        >
-                            <FileCheck2 className="h-4 w-4" />
-                            Review & Resubmit Application
+                            Review & resubmit
+                            <ArrowRight className="h-4 w-4" />
                         </button>
                     ) : (
-                        <Link
-                            to="/login/hospital-admin"
-                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-(--sj-border) bg-(--sj-surface) px-5 py-3.5 text-sm font-black text-(--sj-text) transition hover:border-(--sj-primary)/40 hover:text-(--sj-primary)"
+                        <button
+                            type="button"
+                            onClick={handleRefresh}
+                            className="sj-ai-button h-11 flex-1 px-5"
                         >
-                            <LogIn className="h-4 w-4" />
-                            Return to Hospital Admin Login
-                        </Link>
+                            Check latest status
+                            <RefreshCw className="h-4 w-4" />
+                        </button>
                     )}
+
+                    <Link
+                        to="/login/hospital-admin"
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-(--sj-border) px-5 text-sm font-bold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
+                    >
+                        <LogIn className="h-4 w-4" />
+                        Hospital admin login
+                    </Link>
                 </div>
 
-                <p className="text-center text-xs leading-5 text-(--sj-text-muted)">
-                    Keep your application ID{' '}
-                    <span className="font-bold text-(--sj-text-soft)">
-                        {application.applicationId}
-                    </span>{' '}
-                    for future reference.
-                </p>
+                <div className="mt-6 flex items-center justify-center">
+                    <Link
+                        to="/"
+                        className="inline-flex items-center gap-2 text-xs font-bold text-(--sj-text-muted) transition hover:text-(--sj-text)"
+                    >
+                        <ArrowLeft className="h-3.5 w-3.5" />
+                        Back to home
+                    </Link>
+                </div>
             </div>
         </AuthLayout>
     );

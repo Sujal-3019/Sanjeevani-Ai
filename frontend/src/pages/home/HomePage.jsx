@@ -21,7 +21,7 @@ import {
     X,
     Zap,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo4.png';
@@ -51,10 +51,10 @@ function StatusDot({ type = 'green' }) {
     return (
         <span
             className={`inline-block h-2.5 w-2.5 rounded-full ${type === 'red'
-                ? 'bg-red-500'
-                : type === 'blue'
-                    ? 'bg-blue-500'
-                    : 'bg-emerald-500'
+                    ? 'bg-red-500'
+                    : type === 'blue'
+                        ? 'bg-blue-500'
+                        : 'bg-emerald-500'
                 }`}
         />
     );
@@ -62,15 +62,58 @@ function StatusDot({ type = 'green' }) {
 
 function HomePage() {
     const { theme, toggleTheme } = useTheme();
+    const navigate = useNavigate();
+
     const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+    const [statusModalOpen, setStatusModalOpen] = React.useState(false);
+    const [applicationId, setApplicationId] = React.useState('');
+    const [statusError, setStatusError] = React.useState('');
 
     const isDark = theme === 'dark';
+
+    const handleStatusCheck = (event) => {
+        event.preventDefault();
+
+        const normalizedApplicationId = applicationId.trim().toUpperCase();
+
+        if (!normalizedApplicationId) {
+            setStatusError('Please enter your hospital application ID.');
+            return;
+        }
+
+        if (!/^HSP-\d{4}-\d{5}$/.test(normalizedApplicationId)) {
+            setStatusError(
+                'Please enter a valid application ID, for example HSP-2026-00421.',
+            );
+            return;
+        }
+
+        setStatusError('');
+        setStatusModalOpen(false);
+
+        navigate(
+            `/verification/hospital?applicationId=${encodeURIComponent(
+                normalizedApplicationId,
+            )}`,
+        );
+    };
+
+    const openStatusModal = () => {
+        setApplicationId('');
+        setStatusError('');
+        setStatusModalOpen(true);
+    };
+
+    const closeStatusModal = () => {
+        setStatusModalOpen(false);
+        setStatusError('');
+    };
 
     return (
         <div className="sanjeevani-page min-h-screen overflow-x-hidden">
             {/* =========================================================
-          HEADER
-      ========================================================= */}
+                HEADER
+            ========================================================= */}
             <header className="sticky top-0 z-50 border-b border-(--sj-border) bg-(--sj-bg)/95 backdrop-blur-xl">
                 <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 sm:px-8">
                     <Link to="/" className="flex items-center gap-3">
@@ -84,8 +127,10 @@ function HomePage() {
 
                         <div>
                             <div className="text-lg font-black tracking-tight text-(--sj-text)">
-                                Sanjeevani<span className="text-(--sj-primary)"> AI</span>
+                                Sanjeevani
+                                <span className="text-(--sj-primary)"> AI</span>
                             </div>
+
                             <div className="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-(--sj-text-muted) sm:block">
                                 Emergency coordination
                             </div>
@@ -145,7 +190,6 @@ function HomePage() {
                     </div>
 
                     <div className="flex items-center gap-2 sm:hidden">
-                        {/* Mobile theme toggle */}
                         <button
                             type="button"
                             onClick={toggleTheme}
@@ -159,7 +203,6 @@ function HomePage() {
                             )}
                         </button>
 
-                        {/* Mobile menu */}
                         <button
                             type="button"
                             onClick={() => setMobileMenuOpen((value) => !value)}
@@ -197,7 +240,7 @@ function HomePage() {
                             <a
                                 href="#roles"
                                 onClick={() => setMobileMenuOpen(false)}
-                                className="rounded-xl px-4 py-3 text-sm font-semibold text-(--sj-text-soft) hover:bg-(--sj-surface)"
+                                className="rounded-xl px-4 py-3 text-sm font-semibold text-(--sj-text-soft) hover:bg-(--sj-text)"
                             >
                                 For teams
                             </a>
@@ -224,8 +267,8 @@ function HomePage() {
 
             <main>
                 {/* =========================================================
-            HERO
-        ========================================================= */}
+                    HERO
+                ========================================================= */}
                 <section className="relative overflow-hidden border-b border-(--sj-border)">
                     <div className="absolute inset-0 opacity-40">
                         <div className="absolute left-1/2 top-0 h-150 w-150 -translate-x-1/2 rounded-full bg-(--sj-primary)/8 blur-3xl" />
@@ -235,6 +278,7 @@ function HomePage() {
                         <div>
                             <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-(--sj-border) bg-(--sj-surface) px-3.5 py-2 shadow-sm">
                                 <StatusDot />
+
                                 <span className="text-xs font-bold uppercase tracking-[0.14em] text-(--sj-text-soft)">
                                     Intelligent emergency response
                                 </span>
@@ -298,6 +342,7 @@ function HomePage() {
                                         <p className="text-xs font-bold uppercase tracking-[0.16em] text-(--sj-text-muted)">
                                             Emergency network
                                         </p>
+
                                         <p className="mt-1 text-sm font-bold text-(--sj-text)">
                                             Live response overview
                                         </p>
@@ -313,12 +358,15 @@ function HomePage() {
                                     <div className="absolute inset-0 opacity-60 bg-[linear-gradient(to_right,var(--sj-map-line)_1px,transparent_1px),linear-gradient(to_bottom,var(--sj-map-line)_1px,transparent_1px)]" />
 
                                     <div className="absolute left-[12%] top-[18%] h-28 w-28 rounded-full border border-(--sj-primary)/10 bg-(--sj-primary)/5" />
+
                                     <div className="absolute right-[10%] top-[10%] h-44 w-44 rounded-full border border-blue-500/10 bg-blue-500/5" />
+
                                     <div className="absolute bottom-[5%] left-[35%] h-48 w-48 rounded-full border border-(--sj-primary)/10 bg-(--sj-primary)/5" />
 
                                     <div className="absolute left-[18%] top-[29%]">
                                         <div className="relative">
                                             <div className="absolute -inset-3 animate-ping rounded-full bg-red-500/20" />
+
                                             <div className="relative flex h-11 w-11 items-center justify-center rounded-full border-4 border-white bg-red-500 text-white shadow-lg dark:border-slate-900">
                                                 <MapPin className="h-5 w-5 fill-current" />
                                             </div>
@@ -328,6 +376,7 @@ function HomePage() {
                                             <p className="text-[10px] font-bold uppercase tracking-wider text-red-500">
                                                 Emergency
                                             </p>
+
                                             <p className="text-xs font-bold text-(--sj-text)">
                                                 Patient location
                                             </p>
@@ -343,6 +392,7 @@ function HomePage() {
                                             <p className="text-[10px] font-bold uppercase tracking-wider text-blue-500">
                                                 Matched
                                             </p>
+
                                             <p className="text-xs font-bold text-(--sj-text)">
                                                 Emergency hospital
                                             </p>
@@ -358,6 +408,7 @@ function HomePage() {
                                             <p className="text-[10px] font-bold uppercase tracking-wider text-(--sj-primary)">
                                                 En route
                                             </p>
+
                                             <p className="text-xs font-bold text-(--sj-text)">
                                                 Ambulance A-14
                                             </p>
@@ -394,6 +445,7 @@ function HomePage() {
                                         <p className="text-[10px] font-bold uppercase tracking-wider text-(--sj-text-muted)">
                                             Severity
                                         </p>
+
                                         <p className="mt-1 text-sm font-black text-red-500">
                                             Critical
                                         </p>
@@ -403,6 +455,7 @@ function HomePage() {
                                         <p className="text-[10px] font-bold uppercase tracking-wider text-(--sj-text-muted)">
                                             Ambulance
                                         </p>
+
                                         <p className="mt-1 text-sm font-black text-(--sj-text)">
                                             A-14
                                         </p>
@@ -412,6 +465,7 @@ function HomePage() {
                                         <p className="text-[10px] font-bold uppercase tracking-wider text-(--sj-text-muted)">
                                             ETA
                                         </p>
+
                                         <p className="mt-1 text-sm font-black text-(--sj-primary)">
                                             07 min
                                         </p>
@@ -423,8 +477,8 @@ function HomePage() {
                 </section>
 
                 {/* =========================================================
-            TRUST STRIP
-        ========================================================= */}
+                    TRUST STRIP
+                ========================================================= */}
                 <section className="border-b border-(--sj-border) bg-(--sj-surface)">
                     <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-(--sj-border) sm:grid-cols-4">
                         <div className="px-5 py-7 sm:px-8">
@@ -458,8 +512,8 @@ function HomePage() {
                 </section>
 
                 {/* =========================================================
-            HOW IT WORKS
-        ========================================================= */}
+                    HOW IT WORKS
+                ========================================================= */}
                 <section
                     id="how-it-works"
                     className="border-b border-(--sj-border) px-5 py-20 sm:px-8 lg:py-28"
@@ -523,14 +577,14 @@ function HomePage() {
 
                                             <div
                                                 className={`flex h-11 w-11 items-center justify-center rounded-xl ${step.tone === 'red'
-                                                    ? 'bg-red-500/10 text-red-500'
-                                                    : step.tone === 'blue'
-                                                        ? 'bg-blue-500/10 text-blue-500'
-                                                        : step.tone === 'orange'
-                                                            ? 'bg-orange-500/10 text-orange-500'
-                                                            : step.tone === 'purple'
-                                                                ? 'bg-purple-500/10 text-purple-500'
-                                                                : 'bg-emerald-500/10 text-emerald-500'
+                                                        ? 'bg-red-500/10 text-red-500'
+                                                        : step.tone === 'blue'
+                                                            ? 'bg-blue-500/10 text-blue-500'
+                                                            : step.tone === 'orange'
+                                                                ? 'bg-orange-500/10 text-orange-500'
+                                                                : step.tone === 'purple'
+                                                                    ? 'bg-purple-500/10 text-purple-500'
+                                                                    : 'bg-emerald-500/10 text-emerald-500'
                                                     }`}
                                             >
                                                 <Icon className="h-5 w-5" />
@@ -552,8 +606,8 @@ function HomePage() {
                 </section>
 
                 {/* =========================================================
-            CAPABILITIES
-        ========================================================= */}
+                    CAPABILITIES
+                ========================================================= */}
                 <section
                     id="capabilities"
                     className="border-b border-(--sj-border) bg-(--sj-surface) px-5 py-20 sm:px-8 lg:py-28"
@@ -626,8 +680,8 @@ function HomePage() {
                 </section>
 
                 {/* =========================================================
-            ROLES
-        ========================================================= */}
+                    ROLES
+                ========================================================= */}
                 <section
                     id="roles"
                     className="border-b border-(--sj-border) px-5 py-20 sm:px-8 lg:py-28"
@@ -641,6 +695,7 @@ function HomePage() {
                         />
 
                         <div className="mt-14 grid gap-5 lg:grid-cols-3">
+                            {/* Patient */}
                             <div className="group rounded-3xl border border-(--sj-border) bg-(--sj-surface) p-7 transition hover:-translate-y-1 hover:shadow-xl">
                                 <div className="flex h-13 w-13 items-center justify-center rounded-2xl bg-red-500/10 text-red-500">
                                     <Users className="h-6 w-6" />
@@ -681,6 +736,7 @@ function HomePage() {
                                 </Link>
                             </div>
 
+                            {/* Hospital */}
                             <div className="group rounded-3xl border border-(--sj-border) bg-(--sj-surface) p-7 transition hover:-translate-y-1 hover:shadow-xl">
                                 <div className="flex h-13 w-13 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-500">
                                     <Hospital className="h-6 w-6" />
@@ -712,15 +768,27 @@ function HomePage() {
                                     ))}
                                 </ul>
 
-                                <Link
-                                    to="/register/hospital-admin"
-                                    className="mt-8 inline-flex items-center gap-2 text-sm font-bold text-(--sj-primary)"
-                                >
-                                    Register hospital
-                                    <ArrowRight className="h-4 w-4" />
-                                </Link>
+                                <div className="mt-8 flex flex-col items-start gap-4">
+                                    <Link
+                                        to="/register/hospital-admin"
+                                        className="inline-flex items-center gap-2 text-sm font-bold text-(--sj-primary)"
+                                    >
+                                        Register hospital
+                                        <ArrowRight className="h-4 w-4" />
+                                    </Link>
+
+                                    <button
+                                        type="button"
+                                        onClick={openStatusModal}
+                                        className="inline-flex items-center gap-2 text-sm font-bold text-(--sj-text-soft) transition hover:text-(--sj-primary)"
+                                    >
+                                        <Clock3 className="h-4 w-4" />
+                                        Check hospital status
+                                    </button>
+                                </div>
                             </div>
 
+                            {/* Paramedic */}
                             <div className="group rounded-3xl border border-(--sj-border) bg-(--sj-surface) p-7 transition hover:-translate-y-1 hover:shadow-xl">
                                 <div className="flex h-13 w-13 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
                                     <Truck className="h-6 w-6" />
@@ -770,8 +838,8 @@ function HomePage() {
                 </section>
 
                 {/* =========================================================
-            CTA
-        ========================================================= */}
+                    CTA
+                ========================================================= */}
                 <section className="px-5 py-20 sm:px-8 lg:py-28">
                     <div className="mx-auto max-w-7xl">
                         <div className="relative overflow-hidden rounded-4xl bg-(--sj-navy) px-7 py-12 text-white sm:px-12 lg:px-16 lg:py-16">
@@ -819,8 +887,8 @@ function HomePage() {
             </main>
 
             {/* =========================================================
-          FOOTER
-      ========================================================= */}
+                FOOTER
+            ========================================================= */}
             <footer className="border-t border-(--sj-border) bg-(--sj-surface)">
                 <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8">
                     <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
@@ -837,6 +905,7 @@ function HomePage() {
                                 <p className="text-sm font-black text-(--sj-text)">
                                     Sanjeevani AI
                                 </p>
+
                                 <p className="text-xs text-(--sj-text-muted)">
                                     Intelligent emergency coordination
                                 </p>
@@ -847,12 +916,22 @@ function HomePage() {
                             <a href="#how-it-works" className="hover:text-(--sj-text)">
                                 How it works
                             </a>
+
                             <a href="#capabilities" className="hover:text-(--sj-text)">
                                 Capabilities
                             </a>
+
                             <a href="#roles" className="hover:text-(--sj-text)">
                                 Teams
                             </a>
+                            <button
+                                type="button"
+                                onClick={openStatusModal}
+                                className="inline-flex items-center gap-2 text-sm font-bold text-(--sj-text-soft) transition hover:text-(--sj-primary)"
+                            >
+                                <Clock3 className="h-4 w-4" />
+                                Check hospital status
+                            </button>
                         </div>
                     </div>
 
@@ -870,6 +949,113 @@ function HomePage() {
                     Emergency-ready platform
                 </div>
             </div>
+
+            {/* =========================================================
+                CHECK HOSPITAL STATUS MODAL
+            ========================================================= */}
+            {statusModalOpen && (
+                <div
+                    className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 px-5 py-6 backdrop-blur-sm"
+                    onMouseDown={closeStatusModal}
+                >
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="hospital-status-title"
+                        className="w-full max-w-md rounded-3xl border border-(--sj-border) bg-(--sj-surface) p-6 shadow-2xl sm:p-8"
+                        onMouseDown={(event) => event.stopPropagation()}
+                    >
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-(--sj-primary)/10 text-(--sj-primary)">
+                                    <Hospital className="h-6 w-6" />
+                                </div>
+
+                                <h2
+                                    id="hospital-status-title"
+                                    className="mt-5 text-2xl font-black tracking-tight text-(--sj-text)"
+                                >
+                                    Check hospital status
+                                </h2>
+
+                                <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
+                                    Enter the application ID you received after submitting your
+                                    hospital registration.
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={closeStatusModal}
+                                aria-label="Close"
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-(--sj-border) text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleStatusCheck} className="mt-7">
+                            <label
+                                htmlFor="hospital-application-id"
+                                className="sj-label"
+                            >
+                                Application ID
+                            </label>
+
+                            <input
+                                id="hospital-application-id"
+                                name="applicationId"
+                                type="text"
+                                value={applicationId}
+                                onChange={(event) => {
+                                    setApplicationId(event.target.value.toUpperCase());
+                                    setStatusError('');
+                                }}
+                                placeholder="HSP-2026-00421"
+                                maxLength={14}
+                                autoComplete="off"
+                                className="sj-input h-12 px-4 text-sm font-semibold tracking-wide"
+                            />
+
+                            {statusError && (
+                                <p className="mt-2 text-sm font-semibold text-red-500">
+                                    {statusError}
+                                </p>
+                            )}
+
+                            <div className="mt-4 rounded-2xl border border-(--sj-border) bg-(--sj-bg) p-4">
+                                <div className="flex items-start gap-3">
+                                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-(--sj-primary)" />
+
+                                    <p className="text-xs leading-5 text-(--sj-text-soft)">
+                                        Your application ID is provided after hospital profile
+                                        submission. Keep it safe so you can check your
+                                        verification progress.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                <button
+                                    type="button"
+                                    onClick={closeStatusModal}
+                                    className="h-11 rounded-xl border border-(--sj-border) px-5 text-sm font-bold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
+                                >
+                                    Cancel
+                                </button>
+
+                                <button
+                                    type="submit"
+                                    className="sj-ai-button h-11 px-5"
+                                >
+                                    Check status
+                                    <ArrowRight className="h-4 w-4" />
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

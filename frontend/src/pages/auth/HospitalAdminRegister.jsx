@@ -11,7 +11,7 @@ import {
     Smartphone,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-
+import HospitalProfileSetup from './HospitalProfileSetup';
 import AuthLayout from '../../layouts/AuthLayout';
 
 const INITIAL_FORM = {
@@ -149,7 +149,7 @@ function HospitalAdminRegister() {
         window.setTimeout(() => {
             setIsSubmitting(false);
 
-            navigate('/register/hospital-admin/profile');
+            navigate('/register/hospital/profile');
         }, 700);
     };
 

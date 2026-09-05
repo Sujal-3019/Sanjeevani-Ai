@@ -10,6 +10,8 @@ import TrackingPage from './pages/patient/TrackingPage';
 import MedicalProfile from './pages/patient/MedicalProfile';
 import EmergencyContacts from './pages/patient/EmergencyContacts';
 import EmergencyHistory from './pages/patient/EmergencyHistory';
+import HospitalAdminLogin from './pages/auth/HospitalAdminLogin';
+
 
 function AuthPlaceholder({ title, description }) {
   return (
@@ -88,11 +90,7 @@ export default function App() {
 
         <Route
           path="/login/hospital-admin"
-          element={
-            <AuthPlaceholder
-              title="Hospital Admin Login"
-              description="Access your hospital's emergency coordination center."
-            />
+          element={< HospitalAdminLogin />
           }
         />
 

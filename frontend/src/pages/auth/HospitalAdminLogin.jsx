@@ -429,16 +429,15 @@ function HospitalAdminLogin() {
                     <div className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-(--sj-border) pt-6 text-xs font-bold text-(--sj-text-muted)">
                         <Link
                             to="/login/patient"
-                            className="transition hover:text-(--sj-text)"
+                            className="rounded-xl border border-(--sj-border) px-3 py-3 w-50 text-center text-xs font-bold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                         >
                             Patient login
                         </Link>
 
-                        <span className="h-1 w-1 rounded-full bg-(--sj-border)" />
 
                         <Link
                             to="/login/paramedic"
-                            className="transition hover:text-(--sj-text)"
+                            className="rounded-xl border border-(--sj-border) px-3 py-3 w-50 text-center text-xs font-bold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                         >
                             Paramedic login
                         </Link>

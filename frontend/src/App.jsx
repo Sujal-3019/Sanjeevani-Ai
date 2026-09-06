@@ -21,6 +21,7 @@ import Ambulances from './pages/hospital/Ambulances';
 import Paramedics from './pages/hospital/Paramedics';
 import Capacity from './pages/hospital/Capacity';
 import Services from './pages/hospital/Services';
+import HospitalSettings from './pages/hospital/HospitalSettings';
 
 function AuthPlaceholder({ title, description }) {
   return (
@@ -206,6 +207,11 @@ export default function App() {
         <Route
           path="/dashboard/hospital/services"
           element={<Services />}
+        />
+
+        <Route
+          path="/dashboard/hospital/settings"
+          element={<HospitalSettings />}
         />
 
         {/* =====================================================

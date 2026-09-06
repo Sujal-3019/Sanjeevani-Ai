@@ -17,6 +17,7 @@ import HospitalVerificationStatus from './pages/verification/HospitalVerificatio
 import HospitalDashboard from './pages/hospital/HospitalDashboard';
 import EmergencyRequests from './pages/hospital/EmergencyRequests';
 import ActiveEmergency from './pages/hospital/ActiveEmergency';
+import Ambulances from './pages/hospital/Ambulances';
 
 function AuthPlaceholder({ title, description }) {
   return (
@@ -182,6 +183,11 @@ export default function App() {
         <Route
           path="/dashboard/hospital/emergencies/:emergencyId"
           element={<ActiveEmergency />}
+        />
+
+        <Route
+          path="/dashboard/hospital/ambulances"
+          element={<Ambulances />}
         />
 
         {/* =====================================================

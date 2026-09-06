@@ -15,6 +15,7 @@ import HospitalAdminRegister from './pages/auth/HospitalAdminRegister';
 import HospitalProfileSetup from './pages/auth/HospitalProfileSetup';
 import HospitalVerificationStatus from './pages/verification/HospitalVerificationStatus';
 import HospitalDashboard from './pages/hospital/HospitalDashboard';
+import EmergencyRequests from './pages/hospital/EmergencyRequests';
 
 function AuthPlaceholder({ title, description }) {
   return (
@@ -169,7 +170,12 @@ export default function App() {
 
         <Route
           path="/dashboard/hospital"
-          element={<HospitalDashboard/>}
+          element={<HospitalDashboard />}
+        />
+
+        <Route
+          path="/dashboard/hospital/emergencies"
+          element={<EmergencyRequests />}
         />
 
         {/* =====================================================

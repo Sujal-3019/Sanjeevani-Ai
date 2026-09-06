@@ -490,20 +490,20 @@ export default function Paramedics() {
                     current.map((paramedic) =>
                         paramedic.id === formData.id
                             ? {
-                                  ...paramedic,
-                                  name: formData.name.trim(),
-                                  phone: formData.phone.trim(),
-                                  email: formData.email.trim(),
-                                  role: formData.role,
-                                  qualification:
-                                      formData.qualification.trim(),
-                                  experience: formData.experience.trim(),
-                                  status: formData.status,
-                                  ambulance: formData.ambulance,
-                                  emergencyCertified:
-                                      formData.emergencyCertified,
-                                  lastActive: 'Just now',
-                              }
+                                ...paramedic,
+                                name: formData.name.trim(),
+                                phone: formData.phone.trim(),
+                                email: formData.email.trim(),
+                                role: formData.role,
+                                qualification:
+                                    formData.qualification.trim(),
+                                experience: formData.experience.trim(),
+                                status: formData.status,
+                                ambulance: formData.ambulance,
+                                emergencyCertified:
+                                    formData.emergencyCertified,
+                                lastActive: 'Just now',
+                            }
                             : paramedic,
                     ),
                 );
@@ -561,14 +561,14 @@ export default function Paramedics() {
             current.map((item) =>
                 item.id === paramedic.id
                     ? {
-                          ...item,
-                          status: nextStatus,
-                          ambulance:
-                              nextStatus === 'INACTIVE'
-                                  ? ''
-                                  : item.ambulance,
-                          lastActive: 'Just now',
-                      }
+                        ...item,
+                        status: nextStatus,
+                        ambulance:
+                            nextStatus === 'INACTIVE'
+                                ? ''
+                                : item.ambulance,
+                        lastActive: 'Just now',
+                    }
                     : item,
             ),
         );
@@ -576,14 +576,14 @@ export default function Paramedics() {
         setSelectedParamedic((current) =>
             current?.id === paramedic.id
                 ? {
-                      ...current,
-                      status: nextStatus,
-                      ambulance:
-                          nextStatus === 'INACTIVE'
-                              ? ''
-                              : current.ambulance,
-                      lastActive: 'Just now',
-                  }
+                    ...current,
+                    status: nextStatus,
+                    ambulance:
+                        nextStatus === 'INACTIVE'
+                            ? ''
+                            : current.ambulance,
+                    lastActive: 'Just now',
+                }
                 : current,
         );
     };
@@ -600,9 +600,9 @@ export default function Paramedics() {
 
     return (
         <div className="min-h-screen bg-(--sj-bg) text-(--sj-text)">
-            <HospitalNavbar/>
+            <HospitalNavbar />
 
-            <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
                 <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-(--sj-text-muted)">
@@ -835,21 +835,21 @@ export default function Paramedics() {
                     {(searchTerm ||
                         statusFilter !== 'ALL' ||
                         roleFilter !== 'ALL') && (
-                        <div className="mt-4 flex items-center justify-between border-t border-(--sj-border) pt-4">
-                            <p className="text-xs font-semibold text-(--sj-text-muted)">
-                                Showing {filteredParamedics.length} of{' '}
-                                {paramedics.length} staff members
-                            </p>
+                            <div className="mt-4 flex items-center justify-between border-t border-(--sj-border) pt-4">
+                                <p className="text-xs font-semibold text-(--sj-text-muted)">
+                                    Showing {filteredParamedics.length} of{' '}
+                                    {paramedics.length} staff members
+                                </p>
 
-                            <button
-                                type="button"
-                                onClick={clearFilters}
-                                className="text-xs font-bold text-(--sj-primary) hover:underline"
-                            >
-                                Clear filters
-                            </button>
-                        </div>
-                    )}
+                                <button
+                                    type="button"
+                                    onClick={clearFilters}
+                                    className="text-xs font-bold text-(--sj-primary) hover:underline"
+                                >
+                                    Clear filters
+                                </button>
+                            </div>
+                        )}
                 </section>
 
                 <div className="mb-4 flex items-center justify-between">
@@ -868,49 +868,51 @@ export default function Paramedics() {
                 {filteredParamedics.length === 0 ? (
                     <EmptyState onAdd={openAddModal} />
                 ) : (
-                    <section className="grid gap-4 lg:grid-cols-2">
+                    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         {filteredParamedics.map((paramedic) => (
                             <article
                                 key={paramedic.id}
-                                className="sj-card sj-card-hover overflow-hidden"
+                                className="sj-card sj-card-hover flex min-h-97.5 flex-col overflow-hidden"
                             >
-                                <div className="p-5">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="flex min-w-0 items-start gap-3">
-                                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-(--sj-primary-soft) text-sm font-extrabold text-(--sj-primary)">
-                                                {paramedic.name
-                                                    .split(' ')
-                                                    .map((part) =>
-                                                        part.charAt(0),
-                                                    )
-                                                    .slice(0, 2)
-                                                    .join('')}
-                                            </div>
+                                <div className="flex-1 p-4">
+                                    {/* Header */}
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-(--sj-primary-soft) text-xs font-extrabold text-(--sj-primary)">
+                                            {paramedic.name
+                                                .split(' ')
+                                                .map((part) => part.charAt(0))
+                                                .slice(0, 2)
+                                                .join('')}
+                                        </div>
 
-                                            <div className="min-w-0">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <h3 className="truncate text-base font-extrabold text-(--sj-text)">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0">
+                                                    <h3 className="truncate text-sm font-extrabold text-(--sj-text)">
                                                         {paramedic.name}
                                                     </h3>
 
-                                                    {paramedic.emergencyCertified && (
-                                                        <BadgeCheck className="h-4 w-4 shrink-0 text-(--sj-primary)" />
-                                                    )}
+                                                    <p className="mt-0.5 text-[10px] font-semibold text-(--sj-text-muted)">
+                                                        {paramedic.id}
+                                                    </p>
                                                 </div>
 
-                                                <p className="mt-1 text-xs font-semibold text-(--sj-text-muted)">
-                                                    {paramedic.id}
-                                                </p>
+                                                {paramedic.emergencyCertified && (
+                                                    <BadgeCheck className="h-4 w-4 shrink-0 text-(--sj-primary)" />
+                                                )}
+                                            </div>
 
-                                                <div className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-(--sj-text-soft)">
-                                                    {getRoleIcon(paramedic.role)}
-                                                    {paramedic.role}
-                                                </div>
+                                            <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-(--sj-text-soft)">
+                                                {getRoleIcon(paramedic.role)}
+                                                <span className="truncate">{paramedic.role}</span>
                                             </div>
                                         </div>
+                                    </div>
 
+                                    {/* Status */}
+                                    <div className="mt-4">
                                         <span
-                                            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ${getStatusClasses(
+                                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wide ${getStatusClasses(
                                                 paramedic.status,
                                             )}`}
                                         >
@@ -919,107 +921,132 @@ export default function Paramedics() {
                                                     paramedic.status,
                                                 )}`}
                                             />
+
                                             {formatStatus(paramedic.status)}
                                         </span>
                                     </div>
 
-                                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                                        <div className="rounded-xl bg-(--sj-surface-2) p-3">
-                                            <div className="flex items-center gap-2 text-xs font-bold text-(--sj-text-muted)">
-                                                <Award className="h-4 w-4" />
-                                                Qualification
-                                            </div>
+                                    {/* Professional information */}
+                                    <div className="mt-4 rounded-xl bg-(--sj-surface-2) p-3">
+                                        <div className="flex items-start gap-2">
+                                            <Award className="mt-0.5 h-3.5 w-3.5 shrink-0 text-(--sj-text-muted)" />
 
-                                            <p className="mt-1.5 text-sm font-bold text-(--sj-text)">
-                                                {paramedic.qualification}
-                                            </p>
+                                            <div className="min-w-0">
+                                                <p className="text-[9px] font-bold uppercase tracking-wide text-(--sj-text-muted)">
+                                                    Qualification
+                                                </p>
+
+                                                <p className="mt-1 line-clamp-2 text-xs font-bold leading-4 text-(--sj-text)">
+                                                    {paramedic.qualification}
+                                                </p>
+                                            </div>
                                         </div>
 
-                                        <div className="rounded-xl bg-(--sj-surface-2) p-3">
-                                            <div className="flex items-center gap-2 text-xs font-bold text-(--sj-text-muted)">
-                                                <Clock3 className="h-4 w-4" />
-                                                Experience
-                                            </div>
+                                        <div className="mt-3 flex items-center gap-2 border-t border-(--sj-border) pt-3">
+                                            <Clock3 className="h-3.5 w-3.5 shrink-0 text-(--sj-text-muted)" />
 
-                                            <p className="mt-1.5 text-sm font-bold text-(--sj-text)">
-                                                {paramedic.experience}
-                                            </p>
+                                            <div>
+                                                <p className="text-[9px] font-bold uppercase tracking-wide text-(--sj-text-muted)">
+                                                    Experience
+                                                </p>
+
+                                                <p className="mt-0.5 text-xs font-bold text-(--sj-text)">
+                                                    {paramedic.experience}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="mt-4 space-y-2.5">
-                                        <div className="flex items-center gap-2 text-sm text-(--sj-text-soft)">
-                                            <Phone className="h-4 w-4 shrink-0 text-(--sj-text-muted)" />
-                                            <span>{paramedic.phone}</span>
+                                    {/* Contact information */}
+                                    <div className="mt-4 space-y-2">
+                                        <div className="flex min-w-0 items-center gap-2">
+                                            <Phone className="h-3.5 w-3.5 shrink-0 text-(--sj-text-muted)" />
+
+                                            <span className="truncate text-[11px] font-medium text-(--sj-text-soft)">
+                                                {paramedic.phone}
+                                            </span>
                                         </div>
 
-                                        <div className="flex min-w-0 items-center gap-2 text-sm text-(--sj-text-soft)">
-                                            <Mail className="h-4 w-4 shrink-0 text-(--sj-text-muted)" />
-                                            <span className="truncate">
+                                        <div className="flex min-w-0 items-center gap-2">
+                                            <Mail className="h-3.5 w-3.5 shrink-0 text-(--sj-text-muted)" />
+
+                                            <span className="truncate text-[11px] font-medium text-(--sj-text-soft)">
                                                 {paramedic.email}
                                             </span>
                                         </div>
 
-                                        <div className="flex items-center gap-2 text-sm text-(--sj-text-soft)">
-                                            <Hospital className="h-4 w-4 shrink-0 text-(--sj-text-muted)" />
+                                        <div className="flex min-w-0 items-center gap-2">
+                                            <Hospital className="h-3.5 w-3.5 shrink-0 text-(--sj-text-muted)" />
 
                                             {paramedic.ambulance ? (
-                                                <span>
-                                                    Assigned to{' '}
+                                                <span className="truncate text-[11px] font-medium text-(--sj-text-soft)">
+                                                    Ambulance{' '}
                                                     <strong className="text-(--sj-text)">
                                                         {paramedic.ambulance}
                                                     </strong>
                                                 </span>
                                             ) : (
-                                                <span className="text-(--sj-text-muted)">
+                                                <span className="text-[11px] font-medium text-(--sj-text-muted)">
                                                     No ambulance assigned
                                                 </span>
                                             )}
                                         </div>
                                     </div>
 
-                                    <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-(--sj-border) pt-4">
+                                    {/* Tags */}
+                                    <div className="mt-4 flex flex-wrap gap-1.5">
                                         {paramedic.emergencyCertified && (
-                                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-(--sj-border) bg-(--sj-surface-2) px-2.5 py-1.5 text-[11px] font-bold text-(--sj-text-soft)">
-                                                <ShieldCheck className="h-3.5 w-3.5 text-(--sj-primary)" />
-                                                Emergency certified
+                                            <span className="inline-flex items-center gap-1 rounded-lg border border-(--sj-border) bg-(--sj-surface-2) px-2 py-1 text-[9px] font-bold text-(--sj-text-soft)">
+                                                <ShieldCheck className="h-3 w-3 text-(--sj-primary)" />
+                                                Certified
                                             </span>
                                         )}
 
                                         {paramedic.ambulance && (
-                                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-(--sj-border) bg-(--sj-surface-2) px-2.5 py-1.5 text-[11px] font-bold text-(--sj-text-soft)">
-                                                <MapPin className="h-3.5 w-3.5" />
+                                            <span className="inline-flex items-center gap-1 rounded-lg border border-(--sj-border) bg-(--sj-surface-2) px-2 py-1 text-[9px] font-bold text-(--sj-text-soft)">
+                                                <MapPin className="h-3 w-3" />
                                                 {paramedic.ambulance}
                                             </span>
                                         )}
-
-                                        <span className="ml-auto text-[11px] text-(--sj-text-muted)">
-                                            Active {paramedic.lastActive}
-                                        </span>
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col gap-2 border-t border-(--sj-border) bg-(--sj-surface-2)/50 p-4 sm:flex-row sm:items-center">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setSelectedParamedic(paramedic);
-                                            setIsDetailsOpen(true);
-                                        }}
-                                        className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-(--sj-border) bg-(--sj-surface) px-4 text-xs font-bold text-(--sj-text-soft) transition hover:border-(--sj-primary) hover:text-(--sj-primary)"
-                                    >
-                                        <Users className="h-4 w-4" />
-                                        View details
-                                    </button>
+                                {/* Footer */}
+                                <div className="border-t border-(--sj-border) bg-(--sj-surface-2)/50 p-3">
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <span className="text-[9px] text-(--sj-text-muted)">
+                                            Active {paramedic.lastActive}
+                                        </span>
 
-                                    <button
-                                        type="button"
-                                        onClick={() => openEditModal(paramedic)}
-                                        className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-(--sj-primary) px-4 text-xs font-bold text-white transition hover:bg-(--sj-primary-dark)"
-                                    >
-                                        <Edit3 className="h-4 w-4" />
-                                        Edit
-                                    </button>
+                                        {paramedic.emergencyCertified && (
+                                            <span className="text-[9px] font-bold text-(--sj-primary)">
+                                                Verified
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedParamedic(paramedic);
+                                                setIsDetailsOpen(true);
+                                            }}
+                                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-(--sj-border) bg-(--sj-surface) px-2 text-[10px] font-bold text-(--sj-text-soft) transition hover:border-(--sj-primary) hover:text-(--sj-primary)"
+                                        >
+                                            <Users className="h-3.5 w-3.5" />
+                                            Details
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => openEditModal(paramedic)}
+                                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-(--sj-primary) px-2 text-[10px] font-bold text-white transition hover:bg-(--sj-primary-dark)"
+                                        >
+                                            <Edit3 className="h-3.5 w-3.5" />
+                                            Edit
+                                        </button>
+                                    </div>
                                 </div>
                             </article>
                         ))}
@@ -1488,7 +1515,7 @@ export default function Paramedics() {
                         </div>
 
                         <div className="max-h-[70vh] overflow-y-auto px-5 py-5 sm:px-6">
-                            <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                 <div className="rounded-2xl border border-(--sj-border) p-4">
                                     <p className="text-[11px] font-bold uppercase tracking-wide text-(--sj-text-muted)">
                                         Status
@@ -1609,11 +1636,10 @@ export default function Paramedics() {
                                 onClick={() =>
                                     handleToggleStatus(selectedParamedic)
                                 }
-                                className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-bold transition ${
-                                    selectedParamedic.status === 'INACTIVE'
-                                        ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100 dark:border-green-900/60 dark:bg-green-950/30 dark:text-green-300 dark:hover:bg-green-950/50'
-                                        : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50'
-                                }`}
+                                className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-bold transition ${selectedParamedic.status === 'INACTIVE'
+                                    ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100 dark:border-green-900/60 dark:bg-green-950/30 dark:text-green-300 dark:hover:bg-green-950/50'
+                                    : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50'
+                                    }`}
                             >
                                 {selectedParamedic.status === 'INACTIVE' ? (
                                     <>

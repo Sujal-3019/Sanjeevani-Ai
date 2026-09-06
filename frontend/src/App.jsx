@@ -19,6 +19,7 @@ import EmergencyRequests from './pages/hospital/EmergencyRequests';
 import ActiveEmergency from './pages/hospital/ActiveEmergency';
 import Ambulances from './pages/hospital/Ambulances';
 import Paramedics from './pages/hospital/Paramedics';
+import Capacity from './pages/hospital/Capacity';
 
 function AuthPlaceholder({ title, description }) {
   return (
@@ -194,6 +195,11 @@ export default function App() {
         <Route
           path="/dashboard/hospital/paramedics"
           element={<Paramedics />}
+        />
+
+        <Route
+          path="/dashboard/hospital/capacity"
+          element={<Capacity />}
         />
 
         {/* =====================================================

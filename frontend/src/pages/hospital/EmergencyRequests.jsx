@@ -770,7 +770,7 @@ function EmergencyRequests() {
 
                                                     <div className="mt-4 grid gap-3 sm:grid-cols-3">
                                                         <div className="rounded-xl bg-(--sj-surface-2) p-3">
-                                                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-(--sj-text-muted)">
+                                                            <p className="text-[10px] font-bold uppercase tracking-widest text-(--sj-text-muted)">
                                                                 Patient location
                                                             </p>
 
@@ -782,7 +782,7 @@ function EmergencyRequests() {
                                                         </div>
 
                                                         <div className="rounded-xl bg-(--sj-surface-2) p-3">
-                                                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-(--sj-text-muted)">
+                                                            <p className="text-[10px] font-bold uppercase tracking-widest text-(--sj-text-muted)">
                                                                 Distance
                                                             </p>
 
@@ -792,7 +792,7 @@ function EmergencyRequests() {
                                                         </div>
 
                                                         <div className="rounded-xl bg-(--sj-surface-2) p-3">
-                                                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-(--sj-text-muted)">
+                                                            <p className="text-[10px] font-bold uppercase tracking-widest text-(--sj-text-muted)">
                                                                 Estimated arrival
                                                             </p>
 
@@ -881,7 +881,7 @@ function EmergencyRequests() {
                                     </div>
 
                                     {request.status === 'PENDING' && (
-                                        <div className="flex flex-col gap-3 border-t border-(--sj-border) bg-red-500/[0.025] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                                        <div className="flex flex-col gap-3 border-t border-(--sj-border) bg-red-500/2.5 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                                             <div className="flex items-start gap-3">
                                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
 
@@ -1038,7 +1038,7 @@ function EmergencyRequests() {
                                                 {selectedRequest.aiSummary}
                                             </p>
 
-                                            <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.1em] text-(--sj-primary)">
+                                            <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-(--sj-primary)">
                                                 AI confidence:{' '}
                                                 {
                                                     selectedRequest.aiConfidence

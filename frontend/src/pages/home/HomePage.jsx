@@ -51,10 +51,10 @@ function StatusDot({ type = 'green' }) {
     return (
         <span
             className={`inline-block h-2.5 w-2.5 rounded-full ${type === 'red'
-                    ? 'bg-red-500'
-                    : type === 'blue'
-                        ? 'bg-blue-500'
-                        : 'bg-emerald-500'
+                ? 'bg-red-500'
+                : type === 'blue'
+                    ? 'bg-blue-500'
+                    : 'bg-emerald-500'
                 }`}
         />
     );
@@ -158,6 +158,14 @@ function HomePage() {
                         >
                             For teams
                         </a>
+                        <button
+                            type="button"
+                            onClick={openStatusModal}
+                            className="inline-flex items-center gap-2 text-sm font-bold text-(--sj-text-soft) transition hover:text-(--sj-primary)"
+                        >
+                            <Clock3 className="h-4 w-4" />
+                            Know Status
+                        </button>
                     </nav>
 
                     <div className="hidden items-center gap-3 sm:flex">
@@ -253,12 +261,13 @@ function HomePage() {
                                     Sign in
                                 </Link>
 
-                                <Link
-                                    to="/register/patient"
+                                <Button
+                                    onClick={openStatusModal}
+
                                     className="rounded-xl bg-(--sj-primary) px-4 py-3 text-center text-sm font-bold text-white"
                                 >
                                     Get started
-                                </Link>
+                                </Button>
                             </div>
                         </nav>
                     </div>
@@ -577,14 +586,14 @@ function HomePage() {
 
                                             <div
                                                 className={`flex h-11 w-11 items-center justify-center rounded-xl ${step.tone === 'red'
-                                                        ? 'bg-red-500/10 text-red-500'
-                                                        : step.tone === 'blue'
-                                                            ? 'bg-blue-500/10 text-blue-500'
-                                                            : step.tone === 'orange'
-                                                                ? 'bg-orange-500/10 text-orange-500'
-                                                                : step.tone === 'purple'
-                                                                    ? 'bg-purple-500/10 text-purple-500'
-                                                                    : 'bg-emerald-500/10 text-emerald-500'
+                                                    ? 'bg-red-500/10 text-red-500'
+                                                    : step.tone === 'blue'
+                                                        ? 'bg-blue-500/10 text-blue-500'
+                                                        : step.tone === 'orange'
+                                                            ? 'bg-orange-500/10 text-orange-500'
+                                                            : step.tone === 'purple'
+                                                                ? 'bg-purple-500/10 text-purple-500'
+                                                                : 'bg-emerald-500/10 text-emerald-500'
                                                     }`}
                                             >
                                                 <Icon className="h-5 w-5" />

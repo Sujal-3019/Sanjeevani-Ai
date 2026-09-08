@@ -22,6 +22,8 @@ import Paramedics from './pages/hospital/Paramedics';
 import Capacity from './pages/hospital/Capacity';
 import Services from './pages/hospital/Services';
 import HospitalSettings from './pages/hospital/HospitalSettings';
+import ParamedicLogin from './pages/auth/ParamedicLogin';
+
 
 function AuthPlaceholder({ title, description }) {
   return (
@@ -129,10 +131,7 @@ export default function App() {
         <Route
           path="/login/paramedic"
           element={
-            <AuthPlaceholder
-              title="Paramedic Login"
-              description="Secure operational access for authorized Sanjeevani AI paramedics."
-            />
+            <ParamedicLogin/>
           }
         />
 

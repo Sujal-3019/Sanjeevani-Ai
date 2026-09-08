@@ -24,6 +24,7 @@ import Services from './pages/hospital/Services';
 import HospitalSettings from './pages/hospital/HospitalSettings';
 import ParamedicLogin from './pages/auth/ParamedicLogin';
 import ParamedicDashboard from './pages/paramedic/ParamedicDashboard';
+import ActiveEmergencyParamedic from './pages/paramedic/ActiveEmergencyParamedic';
 
 
 function AuthPlaceholder({ title, description }) {
@@ -132,7 +133,7 @@ export default function App() {
         <Route
           path="/login/paramedic"
           element={
-            <ParamedicLogin/>
+            <ParamedicLogin />
           }
         />
 
@@ -223,6 +224,11 @@ export default function App() {
           element={
             <ParamedicDashboard />
           }
+        />
+
+        <Route
+          path="/dashboard/paramedic/emergency/:emergencyId"
+          element={<ActiveEmergencyParamedic />}
         />
 
         {/* =====================================================

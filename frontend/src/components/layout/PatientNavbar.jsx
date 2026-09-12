@@ -3,9 +3,7 @@ import {
     Activity,
     Bell,
     ChevronDown,
-    // ClipboardHeart,
     FileHeart,
-    HeartPulse,
     History,
     LogOut,
     Menu,
@@ -26,7 +24,7 @@ const MOCK_PATIENT = {
     name: 'Ananya Sharma',
     email: 'ananya.sharma@example.com',
     phone: '+91 98765 43210',
-    status: 'PROFILE_COMPLETE',
+    status: 'ACTIVE',
 };
 
 const NAV_ITEMS = [
@@ -92,7 +90,8 @@ function PatientNavbar() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
-    const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+    const [notifications, setNotifications] =
+        useState(MOCK_NOTIFICATIONS);
 
     const notificationRef = useRef(null);
     const profileRef = useRef(null);
@@ -145,7 +144,14 @@ function PatientNavbar() {
     const handleNavigation = (path) => {
         navigate(path);
         setIsMobileMenuOpen(false);
+        setIsNotificationOpen(false);
         setIsProfileOpen(false);
+    };
+
+    const handleProfileNavigation = (path) => {
+        navigate(path);
+        setIsProfileOpen(false);
+        setIsMobileMenuOpen(false);
     };
 
     const handleReadAll = () => {
@@ -157,26 +163,45 @@ function PatientNavbar() {
         );
     };
 
+    const handleNotificationClick = (notificationId) => {
+        setNotifications((currentNotifications) =>
+            currentNotifications.map((notification) =>
+                notification.id === notificationId
+                    ? {
+                          ...notification,
+                          unread: false,
+                      }
+                    : notification,
+            ),
+        );
+    };
+
     const handleSignOut = () => {
         localStorage.removeItem('sanjeevani_auth');
         navigate('/');
     };
 
-    const handleProfileNavigation = (path) => {
-        navigate(path);
+    const toggleNotifications = () => {
+        setIsNotificationOpen((current) => !current);
         setIsProfileOpen(false);
-        setIsMobileMenuOpen(false);
+    };
+
+    const toggleProfile = () => {
+        setIsProfileOpen((current) => !current);
+        setIsNotificationOpen(false);
     };
 
     return (
         <header className="sticky top-0 z-50 border-b border-(--sj-border) bg-(--sj-surface)/95 shadow-[0_1px_8px_rgba(16,33,43,0.04)] backdrop-blur-xl">
             <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
-                <div className="flex h-18 items-center justify-between gap-4">
+                <div className="flex h-18 items-center justify-between gap-3">
                     {/* Brand */}
                     <button
                         type="button"
-                        onClick={() => handleNavigation('/dashboard/patient')}
-                        className="flex min-w-0 items-center gap-3"
+                        onClick={() =>
+                            handleNavigation('/dashboard/patient')
+                        }
+                        className="flex min-w-0 shrink-0 items-center gap-3"
                     >
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-(--sj-border) bg-(--sj-surface-2)">
                             <img
@@ -198,7 +223,7 @@ function PatientNavbar() {
                     </button>
 
                     {/* Desktop Navigation */}
-                    <nav className="hidden items-center gap-1 lg:flex">
+                    <nav className="hidden items-center gap-1 xl:flex">
                         {NAV_ITEMS.map((item) => {
                             const Icon = item.icon;
                             const active = isActive(item.path);
@@ -207,7 +232,9 @@ function PatientNavbar() {
                                 <button
                                     key={item.path}
                                     type="button"
-                                    onClick={() => handleNavigation(item.path)}
+                                    onClick={() =>
+                                        handleNavigation(item.path)
+                                    }
                                     className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
                                         active
                                             ? 'bg-(--sj-primary-soft) text-(--sj-primary)'
@@ -222,30 +249,30 @@ function PatientNavbar() {
                     </nav>
 
                     {/* Right Actions */}
-                    <div className="flex items-center gap-1.5">
-                        {/* Emergency shortcut */}
+                    <div className="flex min-w-0 items-center gap-1">
+                        {/* SOS */}
                         <button
                             type="button"
                             onClick={() =>
-                                handleNavigation('/dashboard/patient/emergency')
+                                handleNavigation(
+                                    '/dashboard/patient/emergency',
+                                )
                             }
-                            className="hidden items-center gap-2 rounded-xl bg-(--sj-primary) px-3 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-(--sj-primary-dark) sm:flex"
+                            className="hidden items-center gap-2 rounded-xl bg-(--sj-primary) px-3 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-(--sj-primary-dark) lg:flex"
                         >
                             <Siren className="h-4 w-4" />
                             <span>SOS</span>
                         </button>
 
                         {/* Notifications */}
-                        <div className="relative" ref={notificationRef}>
+                        <div
+                            className="relative"
+                            ref={notificationRef}
+                        >
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setIsNotificationOpen(
-                                        (current) => !current,
-                                    );
-                                    setIsProfileOpen(false);
-                                }}
-                                className="relative flex h-10 w-10 items-center justify-center rounded-xl text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
+                                onClick={toggleNotifications}
+                                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                                 aria-label="Notifications"
                             >
                                 <Bell className="h-5 w-5" />
@@ -256,9 +283,9 @@ function PatientNavbar() {
                             </button>
 
                             {isNotificationOpen && (
-                                <div className="absolute right-0 top-[calc(100%+10px)] w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-(--sj-border) bg-(--sj-surface) shadow-xl">
+                                <div className="fixed left-4 right-4 top-19 z-60 overflow-hidden rounded-2xl border border-(--sj-border) bg-(--sj-surface) shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-[calc(100%+10px)] sm:w-95">
                                     <div className="flex items-center justify-between border-b border-(--sj-border) px-4 py-3">
-                                        <div>
+                                        <div className="min-w-0">
                                             <h3 className="text-sm font-bold text-(--sj-text)">
                                                 Notifications
                                             </h3>
@@ -272,14 +299,14 @@ function PatientNavbar() {
                                             <button
                                                 type="button"
                                                 onClick={handleReadAll}
-                                                className="text-xs font-semibold text-(--sj-primary) hover:underline"
+                                                className="shrink-0 text-xs font-semibold text-(--sj-primary) hover:underline"
                                             >
                                                 Read all
                                             </button>
                                         )}
                                     </div>
 
-                                    <div className="max-h-90 overflow-y-auto">
+                                    <div className="max-h-[70vh] overflow-y-auto sm:max-h-90">
                                         {notifications.length > 0 ? (
                                             notifications.map(
                                                 (notification) => (
@@ -287,22 +314,8 @@ function PatientNavbar() {
                                                         key={notification.id}
                                                         type="button"
                                                         onClick={() =>
-                                                            setNotifications(
-                                                                (
-                                                                    currentNotifications,
-                                                                ) =>
-                                                                    currentNotifications.map(
-                                                                        (
-                                                                            currentNotification,
-                                                                        ) =>
-                                                                            currentNotification.id ===
-                                                                            notification.id
-                                                                                ? {
-                                                                                      ...currentNotification,
-                                                                                      unread: false,
-                                                                                  }
-                                                                                : currentNotification,
-                                                                    ),
+                                                            handleNotificationClick(
+                                                                notification.id,
                                                             )
                                                         }
                                                         className="flex w-full gap-3 border-b border-(--sj-border) px-4 py-3 text-left transition last:border-b-0 hover:bg-(--sj-surface-2)"
@@ -313,7 +326,7 @@ function PatientNavbar() {
 
                                                         <div className="min-w-0 flex-1">
                                                             <div className="flex items-start justify-between gap-3">
-                                                                <p className="text-sm font-semibold text-(--sj-text)">
+                                                                <p className="min-w-0 text-sm font-semibold text-(--sj-text)">
                                                                     {
                                                                         notification.title
                                                                     }
@@ -357,11 +370,11 @@ function PatientNavbar() {
                             )}
                         </div>
 
-                        {/* Theme Toggle */}
+                        {/* Theme */}
                         <button
                             type="button"
                             onClick={toggleTheme}
-                            className="flex h-10 w-10 items-center justify-center rounded-xl text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                             aria-label={
                                 theme === 'dark'
                                     ? 'Switch to light theme'
@@ -375,21 +388,21 @@ function PatientNavbar() {
                             )}
                         </button>
 
-                        {/* Profile */}
-                        <div className="relative" ref={profileRef}>
+                        {/* Profile Button */}
+                        <div
+                            className="relative hidden md:block"
+                            ref={profileRef}
+                        >
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setIsProfileOpen((current) => !current);
-                                    setIsNotificationOpen(false);
-                                }}
-                                className="hidden items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-(--sj-surface-2) sm:flex"
+                                onClick={toggleProfile}
+                                className="flex h-10 items-center gap-2 rounded-xl px-2 transition hover:bg-(--sj-surface-2)"
                             >
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-(--sj-primary-soft) text-(--sj-primary)">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-(--sj-primary-soft) text-(--sj-primary)">
                                     <UserRound className="h-4 w-4" />
                                 </div>
 
-                                <div className="hidden max-w-32.5 text-left xl:block">
+                                <div className="hidden max-w-32.5 text-left lg:block">
                                     <p className="truncate text-xs font-bold text-(--sj-text)">
                                         {MOCK_PATIENT.name}
                                     </p>
@@ -399,14 +412,16 @@ function PatientNavbar() {
                                     </p>
                                 </div>
 
-                                <ChevronDown className="hidden h-4 w-4 text-(--sj-text-muted) xl:block" />
+                                <ChevronDown className="hidden h-4 w-4 text-(--sj-text-muted) lg:block" />
                             </button>
 
+                            {/* Profile Dropdown */}
                             {isProfileOpen && (
-                                <div className="absolute right-0 top-[calc(100%+10px)] w-72 overflow-hidden rounded-2xl border border-(--sj-border) bg-(--sj-surface) shadow-xl">
+                                <div className="fixed left-4 right-4 top-19 z-60 overflow-hidden rounded-2xl border border-(--sj-border) bg-(--sj-surface) shadow-xl sm:left-auto sm:right-4 sm:w-80 md:absolute md:left-auto md:right-0 md:top-[calc(100%+10px)]">
+                                    {/* Patient Identity - FIRST */}
                                     <div className="border-b border-(--sj-border) px-4 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-(--sj-primary-soft) text-(--sj-primary)">
+                                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-(--sj-primary-soft) text-(--sj-primary)">
                                                 <UserRound className="h-5 w-5" />
                                             </div>
 
@@ -415,14 +430,19 @@ function PatientNavbar() {
                                                     {MOCK_PATIENT.name}
                                                 </p>
 
-                                                <p className="truncate text-xs text-(--sj-text-muted)">
+                                                <p className="mt-0.5 truncate text-xs text-(--sj-text-muted)">
                                                     {MOCK_PATIENT.email}
+                                                </p>
+
+                                                <p className="mt-0.5 text-xs text-(--sj-text-muted)">
+                                                    {MOCK_PATIENT.phone}
                                                 </p>
                                             </div>
                                         </div>
 
+                                        {/* Status - Immediately after name */}
                                         <div className="mt-3 flex items-center gap-2 rounded-lg bg-(--sj-primary-soft) px-3 py-2">
-                                            <ShieldCheck className="h-4 w-4 text-(--sj-primary)" />
+                                            <ShieldCheck className="h-4 w-4 shrink-0 text-(--sj-primary)" />
 
                                             <span className="text-xs font-semibold text-(--sj-primary)">
                                                 Patient account active
@@ -430,6 +450,7 @@ function PatientNavbar() {
                                         </div>
                                     </div>
 
+                                    {/* Profile Sections - NOT DUPLICATED */}
                                     <div className="p-2">
                                         <button
                                             type="button"
@@ -440,8 +461,8 @@ function PatientNavbar() {
                                             }
                                             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                                         >
-                                            <ClipboardHeart className="h-4 w-4" />
-                                            Medical profile
+                                            <FileHeart className="h-4 w-4 shrink-0" />
+                                            <span>Medical profile</span>
                                         </button>
 
                                         <button
@@ -453,8 +474,10 @@ function PatientNavbar() {
                                             }
                                             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                                         >
-                                            <Phone className="h-4 w-4" />
-                                            Emergency contacts
+                                            <Phone className="h-4 w-4 shrink-0" />
+                                            <span>
+                                                Emergency contacts
+                                            </span>
                                         </button>
 
                                         <button
@@ -466,8 +489,10 @@ function PatientNavbar() {
                                             }
                                             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                                         >
-                                            <History className="h-4 w-4" />
-                                            Emergency history
+                                            <History className="h-4 w-4 shrink-0" />
+                                            <span>
+                                                Emergency history
+                                            </span>
                                         </button>
 
                                         <div className="my-2 border-t border-(--sj-border)" />
@@ -477,21 +502,23 @@ function PatientNavbar() {
                                             onClick={handleSignOut}
                                             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-500 transition hover:bg-red-500/10"
                                         >
-                                            <LogOut className="h-4 w-4" />
-                                            Sign out
+                                            <LogOut className="h-4 w-4 shrink-0" />
+                                            <span>Sign out</span>
                                         </button>
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* Mobile Menu */}
+                        {/* Mobile / Tablet Menu */}
                         <button
                             type="button"
                             onClick={() =>
-                                setIsMobileMenuOpen((current) => !current)
+                                setIsMobileMenuOpen(
+                                    (current) => !current,
+                                )
                             }
-                            className="flex h-10 w-10 items-center justify-center rounded-xl text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text) lg:hidden"
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text) xl:hidden"
                             aria-label={
                                 isMobileMenuOpen
                                     ? 'Close navigation menu'
@@ -507,10 +534,11 @@ function PatientNavbar() {
                     </div>
                 </div>
 
-                {/* Mobile Navigation */}
+                {/* Mobile / Tablet Navigation */}
                 {isMobileMenuOpen && (
-                    <div className="border-t border-(--sj-border) py-3 lg:hidden">
+                    <div className="border-t border-(--sj-border) py-3 xl:hidden">
                         <nav className="grid gap-1">
+                            {/* Main Navigation Only */}
                             {NAV_ITEMS.map((item) => {
                                 const Icon = item.icon;
                                 const active = isActive(item.path);
@@ -528,12 +556,13 @@ function PatientNavbar() {
                                                 : 'text-(--sj-text-soft) hover:bg-(--sj-surface-2) hover:text-(--sj-text)'
                                         }`}
                                     >
-                                        <Icon className="h-5 w-5" />
+                                        <Icon className="h-5 w-5 shrink-0" />
                                         <span>{item.label}</span>
                                     </button>
                                 );
                             })}
 
+                            {/* SOS */}
                             <button
                                 type="button"
                                 onClick={() =>
@@ -547,77 +576,17 @@ function PatientNavbar() {
                                 Emergency / SOS
                             </button>
 
+                            {/* Mobile Controls */}
                             <div className="mt-2 border-t border-(--sj-border) pt-2">
-                                <div className="flex items-center justify-between rounded-xl px-3 py-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-(--sj-primary-soft) text-(--sj-primary)">
-                                            <UserRound className="h-4 w-4" />
-                                        </div>
-
-                                        <div>
-                                            <p className="text-sm font-bold text-(--sj-text)">
-                                                {MOCK_PATIENT.name}
-                                            </p>
-
-                                            <p className="text-xs text-(--sj-text-muted)">
-                                                Patient
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <span className="rounded-full bg-(--sj-primary-soft) px-2 py-1 text-[10px] font-bold text-(--sj-primary)">
-                                        ACTIVE
-                                    </span>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        handleProfileNavigation(
-                                            '/dashboard/patient/medical-profile',
-                                        )
-                                    }
-                                    className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
-                                >
-                                    <ClipboardHeart className="h-4 w-4" />
-                                    Medical profile
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        handleProfileNavigation(
-                                            '/dashboard/patient/emergency-contacts',
-                                        )
-                                    }
-                                    className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
-                                >
-                                    <Phone className="h-4 w-4" />
-                                    Emergency contacts
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        handleProfileNavigation(
-                                            '/dashboard/patient/history',
-                                        )
-                                    }
-                                    className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
-                                >
-                                    <History className="h-4 w-4" />
-                                    Emergency history
-                                </button>
-
                                 <button
                                     type="button"
                                     onClick={toggleTheme}
                                     className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                                 >
                                     {theme === 'dark' ? (
-                                        <Sun className="h-4 w-4" />
+                                        <Sun className="h-4 w-4 shrink-0" />
                                     ) : (
-                                        <Moon className="h-4 w-4" />
+                                        <Moon className="h-4 w-4 shrink-0" />
                                     )}
 
                                     {theme === 'dark'
@@ -630,8 +599,8 @@ function PatientNavbar() {
                                     onClick={handleSignOut}
                                     className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-red-500 transition hover:bg-red-500/10"
                                 >
-                                    <LogOut className="h-4 w-4" />
-                                    Sign out
+                                    <LogOut className="h-4 w-4 shrink-0" />
+                                    <span>Sign out</span>
                                 </button>
                             </div>
                         </nav>

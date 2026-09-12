@@ -16,7 +16,7 @@ import {
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { useTheme } from '../../context/ThemeContext';
-import logo from '../../assets/logo4.png';
+import logo from '../../assets/logo.png';
 
 const MOCK_HOSPITAL = {
     name: 'Sanjeevani Emergency Hospital',

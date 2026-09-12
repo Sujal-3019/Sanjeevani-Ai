@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import logo from '../../assets/logo4.png';
+import logo from '../../assets/logo.png';
 import { useTheme } from '../../context/ThemeContext';
 
 const MOCK_PATIENT = {

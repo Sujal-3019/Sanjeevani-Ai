@@ -24,7 +24,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 
 import { useTheme } from '../../context/ThemeContext';
-import logo from '../../assets/logo4.png';
+import logo from '../../assets/logo.png';
 
 function SectionHeading({ eyebrow, title, description, center = false }) {
     return (

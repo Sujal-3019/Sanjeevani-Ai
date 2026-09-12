@@ -12,7 +12,7 @@ import {
     UserRound,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import PatientHeader from './PatientHeader';
+import PatientNavbar from '../../components/layout/PatientNavbar';
 
 const emergency = {
     id: 'SOS-2026-00481',
@@ -77,7 +77,7 @@ function TrackingPage() {
 
     return (
         <div className="sanjeevani-page min-h-screen">
-            <PatientHeader />
+            <PatientNavbar />
 
             <main className="mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-10">
                 <div className="mb-8">

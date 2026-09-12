@@ -13,7 +13,7 @@ import {
     X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import PatientHeader from './PatientHeader';
+import PatientNavbar from '../../components/layout/PatientNavbar';
 
 const initialContacts = [
     {
@@ -139,7 +139,7 @@ function EmergencyContacts() {
 
     return (
         <div className="sanjeevani-page min-h-screen">
-            <PatientHeader />
+            <PatientNavbar />
 
             <main className="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-12">
                 <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">

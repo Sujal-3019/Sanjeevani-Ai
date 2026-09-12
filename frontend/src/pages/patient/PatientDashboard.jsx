@@ -11,8 +11,8 @@ import {
     UserRound,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import PatientHeader from './PatientHeader';
 import { useTheme } from '../../context/ThemeContext';
+import PatientNavbar from '../../components/layout/PatientNavbar';
 
 const patient = {
     name: 'Aarav Sharma',
@@ -44,7 +44,7 @@ function PatientDashboard() {
             {/* =========================================================
                 HEADER
             ========================================================= */}
-            <PatientHeader />
+            <PatientNavbar />
 
             <main className="mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-10">
                 {/* =====================================================

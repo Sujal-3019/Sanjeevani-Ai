@@ -13,7 +13,7 @@ import {
     Sparkles,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import PatientHeader from './PatientHeader';
+import PatientNavbar from '../../components/layout/PatientNavbar';
 
 const FLOW_STEPS = [
     {
@@ -119,7 +119,7 @@ function EmergencyPage() {
 
     return (
         <div className="sanjeevani-page min-h-screen">
-            <PatientHeader />
+            <PatientNavbar />
 
             <main className="mx-auto max-w-6xl px-5 py-8 sm:px-8 sm:py-12">
                 {step === 'confirm' && (

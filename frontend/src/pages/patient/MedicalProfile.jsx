@@ -14,7 +14,7 @@ import {
     X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import PatientHeader from './PatientHeader';
+import PatientNavbar from '../../components/layout/PatientNavbar';
 
 const PREGNANCY_MIN_AGE = 12;
 const PREGNANCY_MAX_AGE = 55;
@@ -147,7 +147,7 @@ function MedicalProfile() {
 
     return (
         <div className="sanjeevani-page min-h-screen">
-            <PatientHeader />
+            <PatientNavbar />
 
             <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
                 <section className="mb-8">

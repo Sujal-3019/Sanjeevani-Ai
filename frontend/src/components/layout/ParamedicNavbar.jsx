@@ -4,14 +4,11 @@ import {
     Ambulance,
     Bell,
     ChevronDown,
-    Clock3,
     History,
     LogOut,
     Menu,
     Moon,
     Navigation,
-    Phone,
-    ShieldCheck,
     Siren,
     Sun,
     UserRound,
@@ -19,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
-import logo from '../../assets/logo.png';
+import logo from '../../assets/logo4.png';
 import { useTheme } from '../../context/ThemeContext';
 
 const NAV_ITEMS = [
@@ -153,7 +150,8 @@ export default function ParamedicNavbar() {
 
     return (
         <header className="sticky top-0 z-50 border-b border-(--sj-border) bg-(--sj-surface)/95 backdrop-blur">
-            <div className="mx-auto flex h-18 max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto flex h-18 max-w-[1600px] items-center gap-3 px-4 sm:px-6 lg:px-8">
+                {/* Logo / Brand */}
                 <Link
                     to="/dashboard/paramedic"
                     className="flex min-w-0 shrink-0 items-center gap-3"
@@ -175,7 +173,8 @@ export default function ParamedicNavbar() {
                     </div>
                 </Link>
 
-                <nav className="hidden items-center gap-1 lg:flex">
+                {/* Desktop Navigation */}
+                <nav className="hidden items-center gap-1 xl:flex">
                     {NAV_ITEMS.map((item) => {
                         const Icon = item.icon;
                         const active = isNavItemActive(
@@ -200,24 +199,33 @@ export default function ParamedicNavbar() {
                     })}
                 </nav>
 
-                <div className="ml-auto flex items-center gap-2">
-                    <div className="hidden items-center gap-2 rounded-full border border-(--sj-border) bg-(--sj-surface-2) px-3 py-1.5 xl:flex">
+                {/* Right Actions */}
+                <div className="ml-auto flex items-center gap-1 sm:gap-2">
+                    {/* On Duty */}
+                    <div className="hidden items-center gap-2 rounded-full border border-(--sj-border) bg-(--sj-surface-2) px-3 py-1.5 lg:flex">
                         <span className="h-2 w-2 rounded-full bg-(--sj-primary)" />
+
                         <span className="text-xs font-semibold text-(--sj-text-soft)">
                             On duty
                         </span>
                     </div>
 
-                    <div className="relative" ref={notificationRef}>
+                    {/* Notifications */}
+                    <div
+                        className="relative"
+                        ref={notificationRef}
+                    >
                         <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
                                 setIsNotificationOpen(
                                     (current) => !current,
-                                )
-                            }
+                                );
+                                setIsProfileOpen(false);
+                            }}
                             className="relative flex h-10 w-10 items-center justify-center rounded-xl text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                             aria-label="Notifications"
+                            aria-expanded={isNotificationOpen}
                         >
                             <Bell size={19} />
 
@@ -227,7 +235,7 @@ export default function ParamedicNavbar() {
                         </button>
 
                         {isNotificationOpen ? (
-                            <div className="absolute right-0 top-12 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-(--sj-border) bg-(--sj-surface) shadow-xl">
+                            <div className="fixed left-3 right-3 top-19 overflow-hidden rounded-2xl border border-(--sj-border) bg-(--sj-surface) shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:w-85">
                                 <div className="flex items-center justify-between border-b border-(--sj-border) px-4 py-3">
                                     <div>
                                         <p className="text-sm font-bold text-(--sj-text)">
@@ -242,58 +250,78 @@ export default function ParamedicNavbar() {
                                     <button
                                         type="button"
                                         onClick={handleMarkAllRead}
-                                        className="text-xs font-semibold text-(--sj-primary) hover:text-(--sj-primary-dark)"
+                                        className="text-xs font-semibold text-(--sj-primary) transition hover:text-(--sj-primary-dark)"
                                     >
                                         Read all
                                     </button>
                                 </div>
 
                                 <div className="max-h-80 overflow-y-auto">
-                                    {notifications.map(
-                                        (notification) => (
-                                            <div
-                                                key={notification.id}
-                                                className="border-b border-(--sj-border) px-4 py-3 last:border-b-0"
-                                            >
-                                                <div className="flex gap-3">
-                                                    <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-(--sj-primary-soft) text-(--sj-primary)">
-                                                        <Bell size={15} />
-                                                    </div>
+                                    {notifications.length > 0 ? (
+                                        notifications.map(
+                                            (notification) => (
+                                                <div
+                                                    key={
+                                                        notification.id
+                                                    }
+                                                    className="border-b border-(--sj-border) px-4 py-3 last:border-b-0"
+                                                >
+                                                    <div className="flex gap-3">
+                                                        <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-(--sj-primary-soft) text-(--sj-primary)">
+                                                            <Bell
+                                                                size={
+                                                                    15
+                                                                }
+                                                            />
+                                                        </div>
 
-                                                    <div className="min-w-0">
-                                                        <div className="flex items-start gap-2">
-                                                            <p className="text-xs font-semibold text-(--sj-text)">
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-start gap-2">
+                                                                <p className="text-xs font-semibold text-(--sj-text)">
+                                                                    {
+                                                                        notification.title
+                                                                    }
+                                                                </p>
+
+                                                                {notification.unread ? (
+                                                                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                                                                ) : null}
+                                                            </div>
+
+                                                            <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
                                                                 {
-                                                                    notification.title
+                                                                    notification.message
                                                                 }
                                                             </p>
 
-                                                            {notification.unread ? (
-                                                                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
-                                                            ) : null}
+                                                            <p className="mt-1 text-[11px] text-(--sj-text-muted)">
+                                                                {
+                                                                    notification.time
+                                                                }
+                                                            </p>
                                                         </div>
-
-                                                        <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
-                                                            {
-                                                                notification.message
-                                                            }
-                                                        </p>
-
-                                                        <p className="mt-1 text-[11px] text-(--sj-text-muted)">
-                                                            {
-                                                                notification.time
-                                                            }
-                                                        </p>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ),
+                                            ),
+                                        )
+                                    ) : (
+                                        <div className="px-4 py-8 text-center">
+                                            <Bell
+                                                size={24}
+                                                className="mx-auto text-(--sj-text-muted)"
+                                            />
+
+                                            <p className="mt-2 text-xs font-medium text-(--sj-text-soft)">
+                                                No notifications
+                                            </p>
+                                        </div>
                                     )}
                                 </div>
                             </div>
                         ) : null}
                     </div>
 
+                    {/* Theme Toggle */}
                     <button
                         type="button"
                         onClick={toggleTheme}
@@ -307,24 +335,28 @@ export default function ParamedicNavbar() {
                         )}
                     </button>
 
+                    {/* Desktop Profile */}
                     <div
-                        className="relative hidden sm:block"
+                        className="relative hidden xl:block"
                         ref={profileRef}
                     >
                         <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
                                 setIsProfileOpen(
                                     (current) => !current,
-                                )
-                            }
+                                );
+                                setIsNotificationOpen(false);
+                            }}
                             className="flex items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-(--sj-surface-2)"
+                            aria-label="Open profile menu"
+                            aria-expanded={isProfileOpen}
                         >
                             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-(--sj-primary-soft) text-(--sj-primary)">
                                 <UserRound size={17} />
                             </div>
 
-                            <div className="hidden text-left xl:block">
+                            <div className="text-left">
                                 <p className="max-w-32 truncate text-xs font-semibold text-(--sj-text)">
                                     {MOCK_PARAMEDIC.name}
                                 </p>
@@ -348,7 +380,9 @@ export default function ParamedicNavbar() {
                                     </p>
 
                                     <p className="mt-1 text-xs text-(--sj-text-muted)">
-                                        {MOCK_PARAMEDIC.qualification}
+                                        {
+                                            MOCK_PARAMEDIC.qualification
+                                        }
                                     </p>
 
                                     <div className="mt-2 flex items-center gap-2 text-[11px] text-(--sj-text-soft)">
@@ -359,7 +393,7 @@ export default function ParamedicNavbar() {
 
                                 <Link
                                     to="/dashboard/paramedic/profile"
-                                    className="mt-2 flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold text-(--sj-text-soft) hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
+                                    className="mt-2 flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                                 >
                                     <UserRound size={16} />
                                     My profile
@@ -367,7 +401,7 @@ export default function ParamedicNavbar() {
 
                                 <Link
                                     to="/dashboard/paramedic/history"
-                                    className="flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold text-(--sj-text-soft) hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
+                                    className="flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                                 >
                                     <History size={16} />
                                     Mission history
@@ -376,7 +410,7 @@ export default function ParamedicNavbar() {
                                 <button
                                     type="button"
                                     onClick={handleSignOut}
-                                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-500/10"
+                                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-500/10"
                                 >
                                     <LogOut size={16} />
                                     Sign out
@@ -385,6 +419,7 @@ export default function ParamedicNavbar() {
                         ) : null}
                     </div>
 
+                    {/* Tablet / Mobile Menu Button */}
                     <button
                         type="button"
                         onClick={() =>
@@ -392,8 +427,9 @@ export default function ParamedicNavbar() {
                                 (current) => !current,
                             )
                         }
-                        className="flex h-10 w-10 items-center justify-center rounded-xl text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text) lg:hidden"
+                        className="flex h-10 w-10 items-center justify-center rounded-xl text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text) xl:hidden"
                         aria-label="Toggle navigation"
+                        aria-expanded={isMobileMenuOpen}
                     >
                         {isMobileMenuOpen ? (
                             <X size={20} />
@@ -404,9 +440,38 @@ export default function ParamedicNavbar() {
                 </div>
             </div>
 
+            {/* Tablet / Mobile Navigation */}
             {isMobileMenuOpen ? (
-                <div className="border-t border-(--sj-border) bg-(--sj-surface) lg:hidden">
-                    <div className="mx-auto max-w-[1600px] space-y-1 px-4 py-3 sm:px-6">
+                <div className="border-t border-(--sj-border) bg-(--sj-surface) xl:hidden">
+                    <div className="mx-auto max-w-[1600px] space-y-1 px-4 py-3 sm:px-6 lg:px-8">
+                        {/* Duty Status */}
+                        <div className="mb-3 flex items-center justify-between rounded-xl bg-(--sj-surface-2) px-3 py-3">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-(--sj-primary-soft) text-(--sj-primary)">
+                                    <Ambulance size={17} />
+                                </div>
+
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold text-(--sj-text)">
+                                        {MOCK_PARAMEDIC.name}
+                                    </p>
+
+                                    <p className="truncate text-xs text-(--sj-text-muted)">
+                                        {MOCK_PARAMEDIC.ambulanceId}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-2 rounded-full border border-(--sj-border) bg-(--sj-surface) px-2.5 py-1.5">
+                                <span className="h-2 w-2 rounded-full bg-(--sj-primary)" />
+
+                                <span className="text-[11px] font-semibold text-(--sj-text-soft)">
+                                    On duty
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Navigation Items */}
                         {NAV_ITEMS.map((item) => {
                             const Icon = item.icon;
                             const active = isNavItemActive(
@@ -418,10 +483,10 @@ export default function ParamedicNavbar() {
                                 <Link
                                     key={item.path}
                                     to={item.path}
-                                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold ${
+                                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
                                         active
                                             ? 'bg-(--sj-primary-soft) text-(--sj-primary)'
-                                            : 'text-(--sj-text-soft) hover:bg-(--sj-surface-2)'
+                                            : 'text-(--sj-text-soft) hover:bg-(--sj-surface-2) hover:text-(--sj-text)'
                                     }`}
                                 >
                                     <Icon size={18} />
@@ -432,47 +497,37 @@ export default function ParamedicNavbar() {
 
                         <div className="my-2 border-t border-(--sj-border)" />
 
-                        <div className="flex items-center gap-3 rounded-xl bg-(--sj-surface-2) px-3 py-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-(--sj-primary-soft) text-(--sj-primary)">
-                                <UserRound size={17} />
-                            </div>
-
-                            <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-(--sj-text)">
-                                    {MOCK_PARAMEDIC.name}
-                                </p>
-
-                                <p className="truncate text-xs text-(--sj-text-muted)">
-                                    {MOCK_PARAMEDIC.hospital}
-                                </p>
-                            </div>
-                        </div>
-
+                        {/* Profile */}
                         <Link
                             to="/dashboard/paramedic/profile"
-                            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-(--sj-text-soft) hover:bg-(--sj-surface-2)"
+                            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                         >
                             <UserRound size={18} />
                             My profile
                         </Link>
 
+                        {/* Theme */}
                         <button
                             type="button"
                             onClick={toggleTheme}
-                            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-(--sj-text-soft) hover:bg-(--sj-surface-2)"
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                         >
                             {theme === 'dark' ? (
                                 <Sun size={18} />
                             ) : (
                                 <Moon size={18} />
                             )}
-                            Toggle theme
+
+                            {theme === 'dark'
+                                ? 'Switch to light mode'
+                                : 'Switch to dark mode'}
                         </button>
 
+                        {/* Sign Out */}
                         <button
                             type="button"
                             onClick={handleSignOut}
-                            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-red-500 hover:bg-red-500/10"
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-red-500 transition hover:bg-red-500/10"
                         >
                             <LogOut size={18} />
                             Sign out

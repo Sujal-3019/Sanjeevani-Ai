@@ -28,6 +28,7 @@ import ActiveEmergencyParamedic from './pages/paramedic/ActiveEmergencyParamedic
 import ActiveEmergencyDetails from './pages/paramedic/ActiveEmergencyDetails';
 import Navigation from './pages/paramedic/Navigation';
 import MissionHistory from './pages/paramedic/MissionHistory';
+import ParamedicProfile from './pages/paramedic/ParamedicProfile';
 
 function AuthPlaceholder({ title, description }) {
   return (
@@ -251,6 +252,11 @@ export default function App() {
         <Route
           path="/dashboard/paramedic/history"
           element={<MissionHistory />}
+        />
+
+        <Route
+          path="/dashboard/paramedic/profile"
+          element={<ParamedicProfile />}
         />
 
         {/* =====================================================

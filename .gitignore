@@ -1,1 +1,12 @@
 .env
+.venv
+backend/.venv
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.vscode/
+.idea/
+
+*.log

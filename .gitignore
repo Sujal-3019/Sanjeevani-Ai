@@ -10,3 +10,6 @@ __pycache__/
 .idea/
 
 *.log
+
+alembic
+alembic.ini

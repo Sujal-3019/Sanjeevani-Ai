@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.api.router import router as api_router
 from app.core.config import settings
+from app.db.session import engine
 
 
 app = FastAPI(
@@ -24,7 +26,7 @@ app.add_middleware(
 
 app.include_router(
     api_router,
-    prefix="/api/v1",
+    prefix="/api",
 )
 
 
@@ -33,4 +35,20 @@ def root():
     return {
         "message": "Welcome to Sanjeevani AI API",
         "version": "1.0.0",
+    }
+
+
+@app.get("/api/database-test")
+def database_test():
+    with engine.connect() as connection:
+        result = connection.execute(
+            text("SELECT current_database(), version()")
+        )
+
+        database_name, database_version = result.fetchone()
+
+    return {
+        "status": "connected",
+        "database": database_name,
+        "postgresql": database_version,
     }

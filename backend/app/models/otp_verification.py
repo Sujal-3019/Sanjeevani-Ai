@@ -13,7 +13,13 @@ class OTPPurpose(str, enum.Enum):
     LOGIN = "LOGIN"
     REGISTRATION = "REGISTRATION"
     PHONE_VERIFICATION = "PHONE_VERIFICATION"
+    EMAIL_VERIFICATION = "EMAIL_VERIFICATION"
     PASSWORD_RESET = "PASSWORD_RESET"
+
+
+class OTPChannel(str, enum.Enum):
+    SMS = "SMS"
+    EMAIL = "EMAIL"
 
 
 class OTPVerification(Base):
@@ -32,8 +38,18 @@ class OTPVerification(Base):
         index=True,
     )
 
-    mobile_number: Mapped[str] = mapped_column(
-        String(15),
+    channel: Mapped[OTPChannel] = mapped_column(
+        Enum(
+            OTPChannel,
+            name="otp_channel",
+            native_enum=True,
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    destination: Mapped[str] = mapped_column(
+        String(255),
         nullable=False,
         index=True,
     )

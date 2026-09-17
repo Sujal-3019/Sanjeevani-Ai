@@ -1,4 +1,5 @@
 import React from 'react';
+
 import {
     ArrowRight,
     Building2,
@@ -10,8 +11,10 @@ import {
     ShieldCheck,
     Smartphone,
 } from 'lucide-react';
+
 import { Link, useNavigate } from 'react-router-dom';
-import HospitalProfileSetup from './HospitalProfileSetup';
+
+import { useAuth } from '../../context/AuthContext';
 import AuthLayout from '../../layouts/AuthLayout';
 
 const INITIAL_FORM = {
@@ -26,12 +29,16 @@ const INITIAL_FORM = {
 function HospitalAdminRegister() {
     const navigate = useNavigate();
 
+    const {
+        registerHospitalAdmin,
+        verifyRegistrationOTP,
+    } = useAuth();
+
     const [formData, setFormData] = React.useState(INITIAL_FORM);
     const [step, setStep] = React.useState('details');
     const [showPassword, setShowPassword] = React.useState(false);
     const [showConfirmPassword, setShowConfirmPassword] =
         React.useState(false);
-
     const [error, setError] = React.useState('');
     const [successMessage, setSuccessMessage] = React.useState('');
     const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -43,7 +50,9 @@ function HospitalAdminRegister() {
         }
 
         const timer = window.setInterval(() => {
-            setResendCooldown((current) => Math.max(current - 1, 0));
+            setResendCooldown((current) =>
+                Math.max(current - 1, 0),
+            );
         }, 1000);
 
         return () => window.clearInterval(timer);
@@ -52,10 +61,21 @@ function HospitalAdminRegister() {
     const handleInputChange = (event) => {
         const { name, value } = event.target;
 
-        setFormData((current) => ({
-            ...current,
-            [name]: value,
-        }));
+        if (name === 'mobile') {
+            const mobileDigits = value
+                .replace(/\D/g, '')
+                .slice(0, 10);
+
+            setFormData((current) => ({
+                ...current,
+                mobile: mobileDigits,
+            }));
+        } else {
+            setFormData((current) => ({
+                ...current,
+                [name]: value,
+            }));
+        }
 
         setError('');
         setSuccessMessage('');
@@ -86,8 +106,14 @@ function HospitalAdminRegister() {
 
         const mobileDigits = formData.mobile.replace(/\D/g, '');
 
-        if (mobileDigits.length < 10) {
-            return 'Please enter a valid mobile number.';
+        if (mobileDigits.length !== 10) {
+            return 'Please enter a complete 10-digit mobile number.';
+        }
+
+        if (!/^[6-9]\d{9}$/.test(mobileDigits)) {
+            return (
+                'Please enter a valid Indian mobile number starting with 6, 7, 8, or 9.'
+            );
         }
 
         if (!formData.password) {
@@ -109,7 +135,7 @@ function HospitalAdminRegister() {
         return '';
     };
 
-    const handleSendOtp = (event) => {
+    const handleSendOtp = async (event) => {
         event.preventDefault();
 
         const validationError = validateDetails();
@@ -123,22 +149,43 @@ function HospitalAdminRegister() {
         setError('');
         setSuccessMessage('');
 
-        window.setTimeout(() => {
-            setIsSubmitting(false);
+        try {
+            const mobileDigits = formData.mobile.replace(
+                /\D/g,
+                '',
+            );
+
+            await registerHospitalAdmin({
+                full_name: formData.adminFullName.trim(),
+                email: formData.email.trim().toLowerCase(),
+                mobile_number: mobileDigits,
+                password: formData.password,
+                confirm_password: formData.confirmPassword,
+            });
+
             setStep('otp');
             setResendCooldown(30);
 
             setSuccessMessage(
                 'A verification OTP has been sent to your mobile number.',
             );
-        }, 700);
+        } catch (requestError) {
+            setError(
+                requestError?.message ||
+                    'Unable to create the hospital admin account. Please try again.',
+            );
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
-    const handleVerifyOtp = (event) => {
+    const handleVerifyOtp = async (event) => {
         event.preventDefault();
 
         if (!/^\d{6}$/.test(formData.otp)) {
-            setError('Please enter the 6-digit verification OTP.');
+            setError(
+                'Please enter the 6-digit verification OTP.',
+            );
             return;
         }
 
@@ -146,23 +193,72 @@ function HospitalAdminRegister() {
         setError('');
         setSuccessMessage('');
 
-        window.setTimeout(() => {
-            setIsSubmitting(false);
+        try {
+            const mobileDigits = formData.mobile.replace(
+                /\D/g,
+                '',
+            );
 
-            navigate('/register/hospital/profile');
-        }, 700);
+            await verifyRegistrationOTP(
+                mobileDigits,
+                formData.otp,
+            );
+
+            setSuccessMessage(
+                'Mobile number verified successfully. Redirecting to hospital setup...',
+            );
+
+            window.setTimeout(() => {
+                navigate('/register/hospital/profile', {
+                    replace: true,
+                });
+            }, 500);
+        } catch (requestError) {
+            setError(
+                requestError?.message ||
+                    'Invalid or expired OTP. Please try again.',
+            );
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
-    const handleResendOtp = () => {
-        if (resendCooldown > 0) {
+    const handleResendOtp = async () => {
+        if (resendCooldown > 0 || isSubmitting) {
             return;
         }
 
+        setIsSubmitting(true);
         setError('');
-        setSuccessMessage(
-            'A new verification OTP has been sent to your mobile number.',
-        );
-        setResendCooldown(30);
+        setSuccessMessage('');
+
+        try {
+            const mobileDigits = formData.mobile.replace(
+                /\D/g,
+                '',
+            );
+
+            await registerHospitalAdmin({
+                full_name: formData.adminFullName.trim(),
+                email: formData.email.trim().toLowerCase(),
+                mobile_number: mobileDigits,
+                password: formData.password,
+                confirm_password: formData.confirmPassword,
+            });
+
+            setResendCooldown(30);
+
+            setSuccessMessage(
+                'A new verification OTP has been sent to your mobile number.',
+            );
+        } catch (requestError) {
+            setError(
+                requestError?.message ||
+                    'Unable to resend the OTP. Please try again.',
+            );
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleBackToDetails = () => {
@@ -203,12 +299,16 @@ function HospitalAdminRegister() {
                         </h2>
 
                         <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
-                            Start with the details required to create your
-                            hospital administrator account.
+                            Start with the details required to
+                            create your hospital administrator
+                            account.
                         </p>
                     </div>
 
-                    <form onSubmit={handleSendOtp} className="space-y-5">
+                    <form
+                        onSubmit={handleSendOtp}
+                        className="space-y-5"
+                    >
                         <div>
                             <label
                                 htmlFor="adminFullName"
@@ -224,8 +324,12 @@ function HospitalAdminRegister() {
                                     id="adminFullName"
                                     name="adminFullName"
                                     type="text"
-                                    value={formData.adminFullName}
-                                    onChange={handleInputChange}
+                                    value={
+                                        formData.adminFullName
+                                    }
+                                    onChange={
+                                        handleInputChange
+                                    }
                                     placeholder="Enter admin full name"
                                     autoComplete="name"
                                     className="sj-input h-12 pl-10 pr-4 text-sm"
@@ -249,7 +353,9 @@ function HospitalAdminRegister() {
                                     name="email"
                                     type="email"
                                     value={formData.email}
-                                    onChange={handleInputChange}
+                                    onChange={
+                                        handleInputChange
+                                    }
                                     placeholder="admin@hospital.com"
                                     autoComplete="email"
                                     className="sj-input h-12 pl-10 pr-4 text-sm"
@@ -272,10 +378,14 @@ function HospitalAdminRegister() {
                                     id="mobile"
                                     name="mobile"
                                     type="tel"
+                                    inputMode="numeric"
                                     value={formData.mobile}
-                                    onChange={handleInputChange}
+                                    onChange={
+                                        handleInputChange
+                                    }
                                     placeholder="+91 98765 43210"
                                     autoComplete="tel"
+                                    maxLength={10}
                                     className="sj-input h-12 pl-10 pr-4 text-sm"
                                 />
                             </div>
@@ -300,8 +410,12 @@ function HospitalAdminRegister() {
                                             ? 'text'
                                             : 'password'
                                     }
-                                    value={formData.password}
-                                    onChange={handleInputChange}
+                                    value={
+                                        formData.password
+                                    }
+                                    onChange={
+                                        handleInputChange
+                                    }
                                     placeholder="Create a strong password"
                                     autoComplete="new-password"
                                     className="sj-input h-12 pl-10 pr-12 text-sm"
@@ -311,7 +425,8 @@ function HospitalAdminRegister() {
                                     type="button"
                                     onClick={() =>
                                         setShowPassword(
-                                            (current) => !current,
+                                            (current) =>
+                                                !current,
                                         )
                                     }
                                     aria-label={
@@ -353,8 +468,12 @@ function HospitalAdminRegister() {
                                             ? 'text'
                                             : 'password'
                                     }
-                                    value={formData.confirmPassword}
-                                    onChange={handleInputChange}
+                                    value={
+                                        formData.confirmPassword
+                                    }
+                                    onChange={
+                                        handleInputChange
+                                    }
                                     placeholder="Re-enter your password"
                                     autoComplete="new-password"
                                     className="sj-input h-12 pl-10 pr-12 text-sm"
@@ -364,7 +483,8 @@ function HospitalAdminRegister() {
                                     type="button"
                                     onClick={() =>
                                         setShowConfirmPassword(
-                                            (current) => !current,
+                                            (current) =>
+                                                !current,
                                         )
                                     }
                                     aria-label={
@@ -392,7 +512,10 @@ function HospitalAdminRegister() {
                         {successMessage ? (
                             <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium leading-6 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
                                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                                <span>{successMessage}</span>
+
+                                <span>
+                                    {successMessage}
+                                </span>
                             </div>
                         ) : null}
 
@@ -440,13 +563,15 @@ function HospitalAdminRegister() {
 
                             <div>
                                 <p className="text-xs font-black uppercase tracking-[0.12em] text-(--sj-text)">
-                                    Two-step account verification
+                                    Two-step account
+                                    verification
                                 </p>
 
                                 <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
-                                    Your mobile number will be verified with
-                                    an OTP before the hospital setup process
-                                    begins.
+                                    Your mobile number will
+                                    be verified with an OTP
+                                    before the hospital setup
+                                    process begins.
                                 </p>
                             </div>
                         </div>
@@ -454,7 +579,8 @@ function HospitalAdminRegister() {
 
                     <div className="mt-7 text-center">
                         <p className="text-sm text-(--sj-text-soft)">
-                            Already have a hospital admin account?
+                            Already have a hospital admin
+                            account?
                         </p>
 
                         <Link
@@ -469,15 +595,14 @@ function HospitalAdminRegister() {
                     <div className="mt-7 flex items-center justify-center gap-5 border-t border-(--sj-border) pt-6 text-xs font-bold text-(--sj-text-muted)">
                         <Link
                             to="/login/patient"
-                            className="rounded-xl border border-(--sj-border) px-3 py-3 w-50 text-center text-xs font-bold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
+                            className="w-50 rounded-xl border border-(--sj-border) px-3 py-3 text-center text-xs font-bold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                         >
                             Patient login
                         </Link>
 
-
                         <Link
                             to="/login/paramedic"
-                            className="rounded-xl border border-(--sj-border) px-3 py-3 w-50 text-center text-xs font-bold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
+                            className="w-50 rounded-xl border border-(--sj-border) px-3 py-3 text-center text-xs font-bold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                         >
                             Paramedic login
                         </Link>
@@ -503,8 +628,8 @@ function HospitalAdminRegister() {
                         </h2>
 
                         <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
-                            Enter the 6-digit OTP sent to your registered
-                            mobile number.
+                            Enter the 6-digit OTP sent to your
+                            registered mobile number.
                         </p>
                     </div>
 
@@ -518,13 +643,16 @@ function HospitalAdminRegister() {
                                 </p>
 
                                 <p className="mt-1 truncate text-sm font-bold text-(--sj-text)">
-                                    {formData.mobile}
+                                    +91 {formData.mobile}
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    <form onSubmit={handleVerifyOtp} className="space-y-5">
+                    <form
+                        onSubmit={handleVerifyOtp}
+                        className="space-y-5"
+                    >
                         <div>
                             <label
                                 htmlFor="otp"
@@ -541,14 +669,20 @@ function HospitalAdminRegister() {
                                 maxLength={6}
                                 value={formData.otp}
                                 onChange={(event) => {
-                                    const value = event.target.value
-                                        .replace(/\D/g, '')
-                                        .slice(0, 6);
+                                    const value =
+                                        event.target.value
+                                            .replace(
+                                                /\D/g,
+                                                '',
+                                            )
+                                            .slice(0, 6);
 
-                                    setFormData((current) => ({
-                                        ...current,
-                                        otp: value,
-                                    }));
+                                    setFormData(
+                                        (current) => ({
+                                            ...current,
+                                            otp: value,
+                                        }),
+                                    );
 
                                     setError('');
                                     setSuccessMessage('');
@@ -567,8 +701,11 @@ function HospitalAdminRegister() {
 
                         {successMessage ? (
                             <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium leading-6 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
-                                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 " />
-                                <span>{successMessage}</span>
+                                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+
+                                <span>
+                                    {successMessage}
+                                </span>
                             </div>
                         ) : null}
 
@@ -599,7 +736,10 @@ function HospitalAdminRegister() {
                         <button
                             type="button"
                             onClick={handleResendOtp}
-                            disabled={resendCooldown > 0}
+                            disabled={
+                                resendCooldown > 0 ||
+                                isSubmitting
+                            }
                             className="mt-2 text-sm font-black text-(--sj-primary) transition hover:text-(--sj-primary-dark) disabled:cursor-not-allowed disabled:text-(--sj-text-muted)"
                         >
                             {resendCooldown > 0
@@ -618,8 +758,9 @@ function HospitalAdminRegister() {
                                 </p>
 
                                 <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
-                                    After verification, you'll complete your
-                                    hospital profile and submit it for
+                                    After verification, you'll
+                                    complete your hospital
+                                    profile and submit it for
                                     verification.
                                 </p>
                             </div>

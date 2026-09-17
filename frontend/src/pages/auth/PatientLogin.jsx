@@ -13,9 +13,16 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 
 import AuthLayout from '../../layouts/AuthLayout';
+import { useAuth } from '../../context/AuthContext';
+
 
 function PatientLogin() {
     const navigate = useNavigate();
+
+    const {
+        loginWithPassword,
+        verifyLoginOTP,
+    } = useAuth();
 
     const [loginMethod, setLoginMethod] = React.useState('email');
     const [identifier, setIdentifier] = React.useState('');
@@ -25,15 +32,20 @@ function PatientLogin() {
     const [otp, setOtp] = React.useState('');
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState('');
+    const [otpDestination, setOtpDestination] = React.useState('');
 
     const isEmail = loginMethod === 'email';
 
-    const handleLogin = (event) => {
+
+    const handleLogin = async (event) => {
         event.preventDefault();
 
         setError('');
 
-        if (!identifier.trim()) {
+        const normalizedIdentifier =
+            identifier.trim();
+
+        if (!normalizedIdentifier) {
             setError(
                 isEmail
                     ? 'Please enter your email address.'
@@ -47,58 +59,198 @@ function PatientLogin() {
             return;
         }
 
-        setLoading(true);
-
-        /*
-         * Temporary frontend-only authentication flow.
-         *
-         * Later this will call the FastAPI backend:
-         * 1. Verify identifier + password.
-         * 2. Send OTP.
-         * 3. Verify OTP.
-         * 4. Issue access/refresh tokens.
-         */
-
-        setTimeout(() => {
-            setLoading(false);
-            setOtpStep(true);
-        }, 700);
-    };
-
-    const handleVerifyOtp = (event) => {
-        event.preventDefault();
-
-        setError('');
-
-        if (otp.length !== 6) {
-            setError('Please enter the 6-digit verification code.');
+        if (
+            !isEmail &&
+            !/^[6-9]\d{9}$/.test(
+                normalizedIdentifier.replace(/\D/g, ''),
+            )
+        ) {
+            setError(
+                'Please enter a valid Indian mobile number starting with 6, 7, 8, or 9.',
+            );
             return;
         }
 
         setLoading(true);
 
-        /*
-         * Temporary frontend-only OTP verification.
-         * This will later call the FastAPI OTP verification endpoint.
-         */
+        try {
+            const normalizedMobile =
+                normalizedIdentifier
+                    .replace(/\D/g, '');
 
-        setTimeout(() => {
+            const response =
+                await loginWithPassword(
+                    isEmail
+                        ? normalizedIdentifier
+                        : normalizedMobile,
+                    password,
+                );
+
+            setOtpDestination(
+                response?.destination ||
+                normalizedIdentifier,
+            );
+
+            setOtp('');
+            setOtpStep(true);
+        } catch (requestError) {
+            setError(
+                requestError?.message ||
+                'Unable to start login. Please try again.',
+            );
+        } finally {
             setLoading(false);
-            navigate('/dashboard/patient');
-        }, 700);
+        }
     };
+
+
+    const handleVerifyOtp = async (event) => {
+        event.preventDefault();
+
+        setError('');
+
+        if (otp.length !== 6) {
+            setError(
+                'Please enter the 6-digit verification code.',
+            );
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            const response =
+                await verifyLoginOTP(
+                    isEmail
+                        ? identifier.trim()
+                        : identifier.replace(/\D/g, ''),
+                    otp,
+                );
+
+            const authenticatedUser =
+                response?.user;
+
+            if (!authenticatedUser) {
+                throw new Error(
+                    'Unable to load your account information.',
+                );
+            }
+
+            if (
+                authenticatedUser.role !== 'PATIENT'
+            ) {
+                throw new Error(
+                    'This account is not registered as a patient account.',
+                );
+            }
+
+            navigate(
+                '/dashboard/patient',
+                {
+                    replace: true,
+                },
+            );
+        } catch (requestError) {
+            setError(
+                requestError?.message ||
+                'Invalid verification code. Please try again.',
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
 
     const handleGoogleLogin = () => {
-        /*
-         * Google OAuth will be connected here later.
-         */
-        setError('Google sign-in will be connected when authentication is integrated.');
+        setError(
+            'Google sign-in will be connected when Google OAuth is implemented.',
+        );
     };
+
+
+    const handleForgotPassword = () => {
+        setError(
+            'Password recovery will be connected after the password reset flow is implemented.',
+        );
+    };
+
+
+    const handleResendOtp = async () => {
+        setError('');
+        setLoading(true);
+
+        try {
+            const response =
+                await loginWithPassword(
+                    isEmail
+                        ? identifier.trim()
+                        : identifier.replace(/\D/g, ''),
+                    password,
+                );
+
+            setOtp('');
+            setOtpDestination(
+                response?.destination ||
+                otpDestination ||
+                identifier,
+            );
+
+            setError(
+                'A new verification code has been sent.',
+            );
+        } catch (requestError) {
+            setError(
+                requestError?.message ||
+                'Unable to resend the verification code.',
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+    const maskedDestination = () => {
+        if (!otpDestination) {
+            return isEmail
+                ? 'email address'
+                : 'mobile number';
+        }
+
+        if (isEmail) {
+            const [name, domain] =
+                otpDestination.split('@');
+
+            if (!name || !domain) {
+                return otpDestination;
+            }
+
+            const visibleName =
+                name.length <= 2
+                    ? name[0]
+                    : name.slice(0, 2);
+
+            return `${visibleName}***@${domain}`;
+        }
+
+        const digits =
+            otpDestination.replace(/\D/g, '');
+
+        if (digits.length === 10) {
+            return `******${digits.slice(-4)}`;
+        }
+
+        return otpDestination;
+    };
+
 
     return (
         <AuthLayout
             eyebrow="Patient access"
-            title={otpStep ? 'Verify your identity.' : 'Welcome back.'}
+            title={
+                otpStep
+                    ? 'Verify your identity.'
+                    : 'Welcome back.'
+            }
             description={
                 otpStep
                     ? `Enter the verification code sent to your ${isEmail ? 'email address' : 'mobile number'}.`
@@ -154,11 +306,19 @@ function PatientLogin() {
                         </button>
                     </div>
 
-                    <form onSubmit={handleLogin} className="space-y-5">
+                    <form
+                        onSubmit={handleLogin}
+                        className="space-y-5"
+                    >
                         {/* Identifier */}
                         <div>
-                            <label htmlFor="patient-identifier" className="sj-label">
-                                {isEmail ? 'Email address' : 'Mobile number'}
+                            <label
+                                htmlFor="patient-identifier"
+                                className="sj-label"
+                            >
+                                {isEmail
+                                    ? 'Email address'
+                                    : 'Mobile number'}
                             </label>
 
                             <div className="relative">
@@ -170,16 +330,30 @@ function PatientLogin() {
 
                                 <input
                                     id="patient-identifier"
-                                    type={isEmail ? 'email' : 'tel'}
+                                    type={
+                                        isEmail
+                                            ? 'email'
+                                            : 'tel'
+                                    }
                                     value={identifier}
-                                    onChange={(event) => setIdentifier(event.target.value)}
+                                    onChange={(event) =>
+                                        setIdentifier(
+                                            isEmail
+                                                ? event.target.value
+                                                : event.target.value
+                                                      .replace(/\D/g, '')
+                                                      .slice(0, 10),
+                                        )
+                                    }
                                     placeholder={
                                         isEmail
                                             ? 'you@example.com'
                                             : '+91 98765 43210'
                                     }
                                     autoComplete={
-                                        isEmail ? 'email' : 'tel'
+                                        isEmail
+                                            ? 'email'
+                                            : 'tel'
                                     }
                                     className="sj-input h-12 pl-11 pr-4 text-sm"
                                 />
@@ -198,10 +372,8 @@ function PatientLogin() {
 
                                 <button
                                     type="button"
-                                    onClick={() =>
-                                        setError(
-                                            'Password recovery will be connected when authentication is integrated.',
-                                        )
+                                    onClick={
+                                        handleForgotPassword
                                     }
                                     className="text-xs font-bold text-(--sj-primary) hover:underline"
                                 >
@@ -214,10 +386,16 @@ function PatientLogin() {
 
                                 <input
                                     id="patient-password"
-                                    type={showPassword ? 'text' : 'password'}
+                                    type={
+                                        showPassword
+                                            ? 'text'
+                                            : 'password'
+                                    }
                                     value={password}
                                     onChange={(event) =>
-                                        setPassword(event.target.value)
+                                        setPassword(
+                                            event.target.value,
+                                        )
                                     }
                                     placeholder="Enter your password"
                                     autoComplete="current-password"
@@ -227,7 +405,9 @@ function PatientLogin() {
                                 <button
                                     type="button"
                                     onClick={() =>
-                                        setShowPassword((value) => !value)
+                                        setShowPassword(
+                                            (value) => !value,
+                                        )
                                     }
                                     aria-label={
                                         showPassword
@@ -350,13 +530,27 @@ function PatientLogin() {
 
                         <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
                             We sent a 6-digit verification code to your{' '}
-                            {isEmail ? 'email address' : 'mobile number'}.
+                            {isEmail
+                                ? 'email address'
+                                : 'mobile number'}{' '}
+                            {otpDestination && (
+                                <>
+                                    ({maskedDestination()})
+                                </>
+                            )}
+                            .
                         </p>
                     </div>
 
-                    <form onSubmit={handleVerifyOtp} className="space-y-5">
+                    <form
+                        onSubmit={handleVerifyOtp}
+                        className="space-y-5"
+                    >
                         <div>
-                            <label htmlFor="patient-otp" className="sj-label">
+                            <label
+                                htmlFor="patient-otp"
+                                className="sj-label"
+                            >
                                 Verification code
                             </label>
 
@@ -416,12 +610,9 @@ function PatientLogin() {
 
                         <button
                             type="button"
-                            onClick={() =>
-                                setError(
-                                    'A new verification code will be available after backend authentication is connected.',
-                                )
-                            }
-                            className="font-bold text-(--sj-primary) hover:underline"
+                            onClick={handleResendOtp}
+                            disabled={loading}
+                            className="font-bold text-(--sj-primary) hover:underline disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             Resend code
                         </button>
@@ -440,5 +631,6 @@ function PatientLogin() {
         </AuthLayout>
     );
 }
+
 
 export default PatientLogin;

@@ -1,19 +1,32 @@
 import React from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import {
+    BrowserRouter,
+    Navigate,
+    Route,
+    Routes,
+} from 'react-router-dom';
+
+import { AuthProvider } from './context/AuthContext';
+
 import HomePage from './pages/home/HomePage';
+
 import PatientLogin from './pages/auth/PatientLogin';
 import PatientRegister from './pages/auth/PatientRegister';
 import PatientProfileSetup from './pages/auth/PatientProfileSetup';
+
 import PatientDashboard from './pages/patient/PatientDashboard';
 import EmergencyPage from './pages/patient/EmergencyPage';
 import TrackingPage from './pages/patient/TrackingPage';
 import MedicalProfile from './pages/patient/MedicalProfile';
 import EmergencyContacts from './pages/patient/EmergencyContacts';
 import EmergencyHistory from './pages/patient/EmergencyHistory';
+
 import HospitalAdminLogin from './pages/auth/HospitalAdminLogin';
 import HospitalAdminRegister from './pages/auth/HospitalAdminRegister';
 import HospitalProfileSetup from './pages/auth/HospitalProfileSetup';
+
 import HospitalVerificationStatus from './pages/verification/HospitalVerificationStatus';
+
 import HospitalDashboard from './pages/hospital/HospitalDashboard';
 import EmergencyRequests from './pages/hospital/EmergencyRequests';
 import ActiveEmergency from './pages/hospital/ActiveEmergency';
@@ -22,6 +35,7 @@ import Paramedics from './pages/hospital/Paramedics';
 import Capacity from './pages/hospital/Capacity';
 import Services from './pages/hospital/Services';
 import HospitalSettings from './pages/hospital/HospitalSettings';
+
 import ParamedicLogin from './pages/auth/ParamedicLogin';
 import ParamedicDashboard from './pages/paramedic/ParamedicDashboard';
 import ActiveEmergencyParamedic from './pages/paramedic/ActiveEmergencyParamedic';
@@ -30,244 +44,243 @@ import Navigation from './pages/paramedic/Navigation';
 import MissionHistory from './pages/paramedic/MissionHistory';
 import ParamedicProfile from './pages/paramedic/ParamedicProfile';
 
+
 function AuthPlaceholder({ title, description }) {
-  return (
-    <div className="sanjeevani-page flex min-h-screen items-center justify-center p-6">
-      <div className="sj-card w-full max-w-md p-8">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-(--sj-primary)">
-          Sanjeevani AI
-        </p>
+    return (
+        <div className="sanjeevani-page flex min-h-screen items-center justify-center p-6">
+            <div className="sj-card w-full max-w-md p-8">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-(--sj-primary)">
+                    Sanjeevani AI
+                </p>
 
-        <h1 className="mt-3 text-2xl font-extrabold text-(--sj-text)">
-          {title}
-        </h1>
+                <h1 className="mt-3 text-2xl font-extrabold text-(--sj-text)">
+                    {title}
+                </h1>
 
-        <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
-          {description}
-        </p>
-      </div>
-    </div>
-  );
+                <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
+                    {description}
+                </p>
+            </div>
+        </div>
+    );
 }
+
 
 function DashboardPlaceholder({ title }) {
-  return (
-    <div className="sanjeevani-page flex min-h-screen items-center justify-center p-6">
-      <div className="sj-card w-full max-w-xl p-8">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-(--sj-primary)">
-          Dashboard
-        </p>
+    return (
+        <div className="sanjeevani-page flex min-h-screen items-center justify-center p-6">
+            <div className="sj-card w-full max-w-xl p-8">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-(--sj-primary)">
+                    Dashboard
+                </p>
 
-        <h1 className="mt-3 text-2xl font-extrabold text-(--sj-text)">
-          {title}
-        </h1>
+                <h1 className="mt-3 text-2xl font-extrabold text-(--sj-text)">
+                    {title}
+                </h1>
 
-        <p className="mt-2 text-sm leading-6 text-  (--sj-text-soft)">
-          This dashboard will be built in the next frontend phase.
-        </p>
-      </div>
-    </div>
-  );
+                <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
+                    This dashboard will be built in the next frontend phase.
+                </p>
+            </div>
+        </div>
+    );
 }
 
+
 export default function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        {/* =====================================================
-            PUBLIC
-        ===================================================== */}
+    return (
+        <AuthProvider>
+            <BrowserRouter>
+                <Routes>
+                    {/* =====================================================
+                        PUBLIC
+                    ===================================================== */}
 
-        <Route path="/" element={<HomePage />} />
+                    <Route
+                        path="/"
+                        element={<HomePage />}
+                    />
 
-        {/* =====================================================
-            PATIENT AUTHENTICATION
-        ===================================================== */}
+                    {/* =====================================================
+                        PATIENT AUTHENTICATION
+                    ===================================================== */}
 
-        <Route
-          path="/login/patient"
-          element={<PatientLogin />}
-        />
+                    <Route
+                        path="/login/patient"
+                        element={<PatientLogin />}
+                    />
 
-        <Route
-          path="/register/patient"
-          element={<PatientRegister />
-          }
-        />
-        <Route
-          path="/register/patient/profile"
-          element={<PatientProfileSetup />}
-        />
+                    <Route
+                        path="/register/patient"
+                        element={<PatientRegister />}
+                    />
 
+                    <Route
+                        path="/register/patient/profile"
+                        element={<PatientProfileSetup />}
+                    />
 
+                    {/* =====================================================
+                        HOSPITAL ADMIN AUTHENTICATION
+                    ===================================================== */}
 
-        {/* =====================================================
-            HOSPITAL ADMIN AUTHENTICATION
-        ===================================================== */}
+                    <Route
+                        path="/login/hospital-admin"
+                        element={<HospitalAdminLogin />}
+                    />
 
-        <Route
-          path="/login/hospital-admin"
-          element={< HospitalAdminLogin />
-          }
-        />
+                    <Route
+                        path="/register/hospital-admin"
+                        element={<HospitalAdminRegister />}
+                    />
 
-        <Route
-          path="/register/hospital-admin"
-          element={< HospitalAdminRegister />
-          }
-        />
+                    <Route
+                        path="/register/hospital/profile"
+                        element={<HospitalProfileSetup />}
+                    />
 
-        <Route
-          path="/register/hospital/profile"
-          element={< HospitalProfileSetup />
-          }
-        />
+                    <Route
+                        path="/verification/hospital"
+                        element={<HospitalVerificationStatus />}
+                    />
 
-        <Route
-          path="/verification/hospital"
-          element={<HospitalVerificationStatus />}
-        />
+                    {/* =====================================================
+                        PARAMEDIC AUTHENTICATION
+                        No public registration route.
+                    ===================================================== */}
 
-        {/* =====================================================
-            PARAMEDIC AUTHENTICATION
-            No public registration route.
-        ===================================================== */}
+                    <Route
+                        path="/login/paramedic"
+                        element={<ParamedicLogin />}
+                    />
 
-        <Route
-          path="/login/paramedic"
-          element={
-            <ParamedicLogin />
-          }
-        />
+                    {/* =====================================================
+                        PATIENT DASHBOARD
+                    ===================================================== */}
 
-        {/* =====================================================
-            PATIENT DASHBOARD
-        ===================================================== */}
+                    <Route
+                        path="/dashboard/patient"
+                        element={<PatientDashboard />}
+                    />
 
-        <Route
-          path="/dashboard/patient"
-          element={<PatientDashboard />}
-        />
+                    <Route
+                        path="/dashboard/patient/emergency"
+                        element={<EmergencyPage />}
+                    />
 
-        <Route
-          path="/dashboard/patient/emergency"
-          element={<EmergencyPage />}
-        />
+                    <Route
+                        path="/dashboard/patient/medical-profile"
+                        element={<MedicalProfile />}
+                    />
 
-        <Route
-          path="/dashboard/patient/medical-profile"
-          element={<MedicalProfile />}
-        />
+                    <Route
+                        path="/dashboard/patient/tracking"
+                        element={<TrackingPage />}
+                    />
 
-        <Route
-          path="/dashboard/patient/tracking"
-          element={<TrackingPage />}
-        />
+                    <Route
+                        path="/dashboard/patient/emergency-contacts"
+                        element={<EmergencyContacts />}
+                    />
 
-        <Route
-          path="/dashboard/patient/emergency-contacts"
-          element={<EmergencyContacts />}
-        />
+                    <Route
+                        path="/dashboard/patient/history"
+                        element={<EmergencyHistory />}
+                    />
 
-        <Route
-          path="/dashboard/patient/history"
-          element={<EmergencyHistory />}
-        />
+                    {/* =====================================================
+                        HOSPITAL ADMIN DASHBOARD
+                    ===================================================== */}
 
-        {/* =====================================================
-            HOSPITAL ADMIN DASHBOARD
-        ===================================================== */}
+                    <Route
+                        path="/dashboard/hospital"
+                        element={<HospitalDashboard />}
+                    />
 
-        <Route
-          path="/dashboard/hospital"
-          element={<HospitalDashboard />}
-        />
+                    <Route
+                        path="/dashboard/hospital/emergencies"
+                        element={<EmergencyRequests />}
+                    />
 
-        <Route
-          path="/dashboard/hospital/emergencies"
-          element={<EmergencyRequests />}
-        />
+                    <Route
+                        path="/dashboard/hospital/emergencies/:emergencyId"
+                        element={<ActiveEmergency />}
+                    />
 
-        <Route
-          path="/dashboard/hospital/emergencies/:emergencyId"
-          element={<ActiveEmergency />}
-        />
+                    <Route
+                        path="/dashboard/hospital/ambulances"
+                        element={<Ambulances />}
+                    />
 
-        <Route
-          path="/dashboard/hospital/ambulances"
-          element={<Ambulances />}
-        />
+                    <Route
+                        path="/dashboard/hospital/paramedics"
+                        element={<Paramedics />}
+                    />
 
-        <Route
-          path="/dashboard/hospital/paramedics"
-          element={<Paramedics />}
-        />
+                    <Route
+                        path="/dashboard/hospital/capacity"
+                        element={<Capacity />}
+                    />
 
-        <Route
-          path="/dashboard/hospital/capacity"
-          element={<Capacity />}
-        />
+                    <Route
+                        path="/dashboard/hospital/services"
+                        element={<Services />}
+                    />
 
-        <Route
-          path="/dashboard/hospital/services"
-          element={<Services />}
-        />
+                    <Route
+                        path="/dashboard/hospital/settings"
+                        element={<HospitalSettings />}
+                    />
 
-        <Route
-          path="/dashboard/hospital/settings"
-          element={<HospitalSettings />}
-        />
+                    {/* =====================================================
+                        PARAMEDIC DASHBOARD
+                    ===================================================== */}
 
-        {/* =====================================================
-            PARAMEDIC DASHBOARD
-        ===================================================== */}
+                    <Route
+                        path="/dashboard/paramedic"
+                        element={<ParamedicDashboard />}
+                    />
 
-        <Route
-          path="/dashboard/paramedic"
-          element={
-            <ParamedicDashboard />
-          }
-        />
+                    <Route
+                        path="/dashboard/paramedic/emergency"
+                        element={<ActiveEmergencyParamedic />}
+                    />
 
-        <Route
-          path="/dashboard/paramedic/emergency"
-          element={<ActiveEmergencyParamedic />}
-        />
+                    <Route
+                        path="/dashboard/paramedic/emergency/:emergencyId"
+                        element={<ActiveEmergencyDetails />}
+                    />
 
-        <Route
-          path="/dashboard/paramedic/emergency/:emergencyId"
-          element={<ActiveEmergencyDetails />}
-        />
+                    <Route
+                        path="/dashboard/paramedic/navigation"
+                        element={<Navigation />}
+                    />
 
-        <Route
-          path="/dashboard/paramedic/navigation"
-          element={<Navigation />}
-        />
+                    <Route
+                        path="/dashboard/paramedic/navigation/:emergencyId"
+                        element={<Navigation />}
+                    />
 
-        <Route
-          path="/dashboard/paramedic/navigation/:emergencyId"
-          element={<Navigation />}
-        />
+                    <Route
+                        path="/dashboard/paramedic/history"
+                        element={<MissionHistory />}
+                    />
 
-        <Route
-          path="/dashboard/paramedic/history"
-          element={<MissionHistory />}
-        />
+                    <Route
+                        path="/dashboard/paramedic/profile"
+                        element={<ParamedicProfile />}
+                    />
 
-        <Route
-          path="/dashboard/paramedic/profile"
-          element={<ParamedicProfile />}
-        />
+                    {/* =====================================================
+                        FALLBACK
+                    ===================================================== */}
 
-        {/* =====================================================
-            FALLBACK
-        ===================================================== */}
-
-        <Route
-          path="*"
-          element={<Navigate to="/" replace />}
-        />
-      </Routes>
-    </BrowserRouter>
-  );
+                    <Route
+                        path="*"
+                        element={<Navigate to="/" replace />}
+                    />
+                </Routes>
+            </BrowserRouter>
+        </AuthProvider>
+    );
 }

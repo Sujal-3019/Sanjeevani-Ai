@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
+from app.core.config import settings
 from app.core.security import (
     OTP_MAX_ATTEMPTS,
     create_access_token,
@@ -258,6 +258,41 @@ class AuthService:
 
         return user
 
+        # ------------------------------------------------------------------
+    # User lookup
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def get_user_by_identifier(
+        db: Session,
+        identifier: str,
+    ) -> User:
+        """
+        Find a user by email or mobile number.
+        """
+
+        normalized_identifier = identifier.strip()
+
+        if "@" in normalized_identifier:
+            user = db.scalar(
+                select(User).where(
+                    User.email == normalized_identifier.lower(),
+                )
+            )
+        else:
+            user = db.scalar(
+                select(User).where(
+                    User.mobile_number == normalized_identifier,
+                )
+            )
+
+        if user is None:
+            raise InvalidCredentialsError(
+                "No account was found for this identifier."
+            )
+
+        return user
+
     # ------------------------------------------------------------------
     # OTP creation
     # ------------------------------------------------------------------
@@ -386,6 +421,22 @@ class AuthService:
 
         return otp_verification
 
+    @staticmethod
+    def mark_user_verified(
+        db: Session,
+        user: User,
+    ) -> User:
+        """
+        Mark a user account as verified after successful verification.
+        """
+
+        user.is_verified = True
+
+        db.commit()
+        db.refresh(user)
+
+        return user
+
     # ------------------------------------------------------------------
     # Login session creation
     # ------------------------------------------------------------------
@@ -428,6 +479,9 @@ class AuthService:
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
+            "expires_in": settings.access_token_expire_minutes * 60,
+            "user_id": user.id,
+            "role": user.role.value,
         }
 
     # ------------------------------------------------------------------
@@ -512,6 +566,9 @@ class AuthService:
         return user, {
             "access_token": access_token,
             "token_type": "bearer",
+            "expires_in": settings.access_token_expire_minutes * 60,
+            "user_id": user.id,
+            "role": user.role.value,
         }
 
     # ------------------------------------------------------------------

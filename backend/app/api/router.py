@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 
+from app.api.auth import router as auth_router
+
 
 router = APIRouter()
 
@@ -10,3 +12,9 @@ def health_check():
         "status": "ok",
         "service": "Sanjeevani AI API",
     }
+
+
+router.include_router(
+    auth_router,
+    prefix="/auth",
+)

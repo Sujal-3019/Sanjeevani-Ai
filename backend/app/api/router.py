@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.auth import router as auth_router
+from app.api.test_protected import router as test_protected_router
 
 
 router = APIRouter()
@@ -17,4 +18,8 @@ def health_check():
 router.include_router(
     auth_router,
     prefix="/auth",
+)
+
+router.include_router(
+    test_protected_router,
 )

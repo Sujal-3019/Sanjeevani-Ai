@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.models.otp_verification import OTPChannel, OTPPurpose
 from app.models.user import User, UserRole
 from app.schemas.auth import (
+    CurrentUserResponse,
     HospitalAdminRegisterRequest,
     LogoutRequest,
     MessageResponse,
@@ -26,6 +27,7 @@ from app.services.auth_service import (
     InvalidCredentialsError,
     InvalidOTPError,
 )
+from app.api.dependencies import get_current_user
 
 
 router = APIRouter()
@@ -520,4 +522,22 @@ def logout(
 
     return MessageResponse(
         message="Logged out successfully.",
+    )
+
+@router.get(
+    "/me",
+    response_model=CurrentUserResponse,
+)
+def get_me(
+    current_user: User = Depends(get_current_user),
+):
+    return CurrentUserResponse(
+        id=current_user.id,
+        role=current_user.role.value,
+        full_name=current_user.full_name,
+        email=current_user.email,
+        mobile_number=current_user.mobile_number,
+        status=current_user.status.value,
+        is_active=current_user.is_active,
+        is_verified=current_user.is_verified,
     )

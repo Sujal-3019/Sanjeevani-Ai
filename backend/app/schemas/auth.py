@@ -294,9 +294,7 @@ class LogoutRequest(BaseModel):
 # ============================================================================
 
 class CurrentUserResponse(BaseModel):
-    model_config = ConfigDict(
-        from_attributes=True,
-    )
+    model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     role: str
@@ -305,3 +303,4 @@ class CurrentUserResponse(BaseModel):
     mobile_number: str | None
     status: str
     is_active: bool
+    is_verified: bool

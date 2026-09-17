@@ -17,6 +17,7 @@ import {
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import logo from '../../assets/logo4.png';
+import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 
 const NAV_ITEMS = [
@@ -85,11 +86,15 @@ function isNavItemActive(pathname, itemPath) {
 export default function ParamedicNavbar() {
     const navigate = useNavigate();
     const location = useLocation();
+
+    const { logout } = useAuth();
     const { theme, toggleTheme } = useTheme();
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [isSigningOut, setIsSigningOut] = useState(false);
+
     const [notifications, setNotifications] = useState(
         MOCK_NOTIFICATIONS,
     );
@@ -143,9 +148,31 @@ export default function ParamedicNavbar() {
         );
     };
 
-    const handleSignOut = () => {
-        localStorage.removeItem('sanjeevani_auth');
-        navigate('/');
+    const handleSignOut = async () => {
+        if (isSigningOut) {
+            return;
+        }
+
+        setIsSigningOut(true);
+
+        setIsMobileMenuOpen(false);
+        setIsNotificationOpen(false);
+        setIsProfileOpen(false);
+
+        try {
+            await logout();
+        } catch (error) {
+            console.warn(
+                'Logout request failed. Clearing local session anyway.',
+                error,
+            );
+        } finally {
+            navigate('/', {
+                replace: true,
+            });
+
+            setIsSigningOut(false);
+        }
     };
 
     return (
@@ -177,6 +204,7 @@ export default function ParamedicNavbar() {
                 <nav className="hidden items-center gap-1 xl:flex">
                     {NAV_ITEMS.map((item) => {
                         const Icon = item.icon;
+
                         const active = isNavItemActive(
                             location.pathname,
                             item.path,
@@ -193,6 +221,7 @@ export default function ParamedicNavbar() {
                                 }`}
                             >
                                 <Icon size={16} />
+
                                 {item.label}
                             </Link>
                         );
@@ -221,6 +250,7 @@ export default function ParamedicNavbar() {
                                 setIsNotificationOpen(
                                     (current) => !current,
                                 );
+
                                 setIsProfileOpen(false);
                             }}
                             className="relative flex h-10 w-10 items-center justify-center rounded-xl text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
@@ -346,6 +376,7 @@ export default function ParamedicNavbar() {
                                 setIsProfileOpen(
                                     (current) => !current,
                                 );
+
                                 setIsNotificationOpen(false);
                             }}
                             className="flex items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-(--sj-surface-2)"
@@ -387,6 +418,7 @@ export default function ParamedicNavbar() {
 
                                     <div className="mt-2 flex items-center gap-2 text-[11px] text-(--sj-text-soft)">
                                         <Ambulance size={13} />
+
                                         {MOCK_PARAMEDIC.ambulanceId}
                                     </div>
                                 </div>
@@ -410,10 +442,14 @@ export default function ParamedicNavbar() {
                                 <button
                                     type="button"
                                     onClick={handleSignOut}
-                                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-500/10"
+                                    disabled={isSigningOut}
+                                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     <LogOut size={16} />
-                                    Sign out
+
+                                    {isSigningOut
+                                        ? 'Signing out...'
+                                        : 'Sign out'}
                                 </button>
                             </div>
                         ) : null}
@@ -474,6 +510,7 @@ export default function ParamedicNavbar() {
                         {/* Navigation Items */}
                         {NAV_ITEMS.map((item) => {
                             const Icon = item.icon;
+
                             const active = isNavItemActive(
                                 location.pathname,
                                 item.path,
@@ -490,6 +527,7 @@ export default function ParamedicNavbar() {
                                     }`}
                                 >
                                     <Icon size={18} />
+
                                     {item.label}
                                 </Link>
                             );
@@ -527,10 +565,14 @@ export default function ParamedicNavbar() {
                         <button
                             type="button"
                             onClick={handleSignOut}
-                            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-red-500 transition hover:bg-red-500/10"
+                            disabled={isSigningOut}
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             <LogOut size={18} />
-                            Sign out
+
+                            {isSigningOut
+                                ? 'Signing out...'
+                                : 'Sign out'}
                         </button>
                     </div>
                 </div>

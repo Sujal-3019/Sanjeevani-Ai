@@ -18,6 +18,7 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import logo from '../../assets/logo.png';
+import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 
 const MOCK_PATIENT = {
@@ -84,12 +85,16 @@ const MOCK_NOTIFICATIONS = [
 
 function PatientNavbar() {
     const { theme, toggleTheme } = useTheme();
+    const { logout } = useAuth();
+
     const location = useLocation();
     const navigate = useNavigate();
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [isSigningOut, setIsSigningOut] = useState(false);
+
     const [notifications, setNotifications] =
         useState(MOCK_NOTIFICATIONS);
 
@@ -120,7 +125,10 @@ function PatientNavbar() {
         document.addEventListener('mousedown', handleOutsideClick);
 
         return () => {
-            document.removeEventListener('mousedown', handleOutsideClick);
+            document.removeEventListener(
+                'mousedown',
+                handleOutsideClick,
+            );
         };
     }, []);
 
@@ -176,9 +184,24 @@ function PatientNavbar() {
         );
     };
 
-    const handleSignOut = () => {
-        localStorage.removeItem('sanjeevani_auth');
-        navigate('/');
+    const handleSignOut = async () => {
+        if (isSigningOut) {
+            return;
+        }
+
+        setIsSigningOut(true);
+
+        try {
+            await logout();
+        } catch (error) {
+            console.warn(
+                'Logout request failed. Clearing local session anyway.',
+                error,
+            );
+        } finally {
+            navigate('/', { replace: true });
+            setIsSigningOut(false);
+        }
     };
 
     const toggleNotifications = () => {
@@ -418,7 +441,7 @@ function PatientNavbar() {
                             {/* Profile Dropdown */}
                             {isProfileOpen && (
                                 <div className="fixed left-4 right-4 top-19 z-60 overflow-hidden rounded-2xl border border-(--sj-border) bg-(--sj-surface) shadow-xl sm:left-auto sm:right-4 sm:w-80 md:absolute md:left-auto md:right-0 md:top-[calc(100%+10px)]">
-                                    {/* Patient Identity - FIRST */}
+                                    {/* Patient Identity */}
                                     <div className="border-b border-(--sj-border) px-4 py-4">
                                         <div className="flex items-center gap-3">
                                             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-(--sj-primary-soft) text-(--sj-primary)">
@@ -440,7 +463,6 @@ function PatientNavbar() {
                                             </div>
                                         </div>
 
-                                        {/* Status - Immediately after name */}
                                         <div className="mt-3 flex items-center gap-2 rounded-lg bg-(--sj-primary-soft) px-3 py-2">
                                             <ShieldCheck className="h-4 w-4 shrink-0 text-(--sj-primary)" />
 
@@ -450,7 +472,7 @@ function PatientNavbar() {
                                         </div>
                                     </div>
 
-                                    {/* Profile Sections - NOT DUPLICATED */}
+                                    {/* Profile Sections */}
                                     <div className="p-2">
                                         <button
                                             type="button"
@@ -500,10 +522,16 @@ function PatientNavbar() {
                                         <button
                                             type="button"
                                             onClick={handleSignOut}
-                                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-500 transition hover:bg-red-500/10"
+                                            disabled={isSigningOut}
+                                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             <LogOut className="h-4 w-4 shrink-0" />
-                                            <span>Sign out</span>
+
+                                            <span>
+                                                {isSigningOut
+                                                    ? 'Signing out...'
+                                                    : 'Sign out'}
+                                            </span>
                                         </button>
                                     </div>
                                 </div>
@@ -538,7 +566,6 @@ function PatientNavbar() {
                 {isMobileMenuOpen && (
                     <div className="border-t border-(--sj-border) py-3 xl:hidden">
                         <nav className="grid gap-1">
-                            {/* Main Navigation Only */}
                             {NAV_ITEMS.map((item) => {
                                 const Icon = item.icon;
                                 const active = isActive(item.path);
@@ -597,10 +624,16 @@ function PatientNavbar() {
                                 <button
                                     type="button"
                                     onClick={handleSignOut}
-                                    className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-red-500 transition hover:bg-red-500/10"
+                                    disabled={isSigningOut}
+                                    className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     <LogOut className="h-4 w-4 shrink-0" />
-                                    <span>Sign out</span>
+
+                                    <span>
+                                        {isSigningOut
+                                            ? 'Signing out...'
+                                            : 'Sign out'}
+                                    </span>
                                 </button>
                             </div>
                         </nav>

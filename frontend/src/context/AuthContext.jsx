@@ -182,8 +182,11 @@ export function AuthProvider({ children }) {
 
     const logout = useCallback(
         async () => {
-            await authService.logout();
-            setUser(null);
+            try {
+                await authService.logout();
+            } finally {
+                setUser(null);
+            }
         },
         [],
     );

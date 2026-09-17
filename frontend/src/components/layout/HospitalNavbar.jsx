@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
+import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo.png';
 
@@ -95,6 +96,7 @@ const NOTIFICATIONS = [
 
 function HospitalNavbar() {
     const { theme, toggleTheme } = useTheme();
+    const { logout } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -157,12 +159,27 @@ function HospitalNavbar() {
         setMobileMenuOpen(false);
     };
 
-    const handleSignOut = () => {
+    const [isSigningOut, setIsSigningOut] = useState(false);
+
+    const handleSignOut = async () => {
+        if (isSigningOut) {
+            return;
+        }
+
+        setIsSigningOut(true);
         closeAllMenus();
 
-        localStorage.removeItem('sanjeevani_auth');
-
-        navigate('/');
+        try {
+            await logout();
+        } catch (error) {
+            console.warn(
+                'Logout request failed. Clearing local session anyway.',
+                error,
+            );
+        } finally {
+            navigate('/', { replace: true });
+            setIsSigningOut(false);
+        }
     };
 
     const handleNavigation = (path) => {
@@ -238,11 +255,10 @@ function HospitalNavbar() {
                                     key={item.label}
                                     to={item.path}
                                     onClick={closeAllMenus}
-                                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-[11px] font-bold transition 2xl:gap-2 2xl:px-3 2xl:text-xs ${
-                                        active
-                                            ? 'bg-(--sj-primary)/10 text-(--sj-primary)'
-                                            : 'text-(--sj-text-soft) hover:bg-(--sj-surface-2) hover:text-(--sj-text)'
-                                    }`}
+                                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-[11px] font-bold transition 2xl:gap-2 2xl:px-3 2xl:text-xs ${active
+                                        ? 'bg-(--sj-primary)/10 text-(--sj-primary)'
+                                        : 'text-(--sj-text-soft) hover:bg-(--sj-surface-2) hover:text-(--sj-text)'
+                                        }`}
                                 >
                                     <Icon className="h-3.5 w-3.5 shrink-0 2xl:h-4 2xl:w-4" />
 
@@ -329,19 +345,18 @@ function HospitalNavbar() {
                                                     key={notification.id}
                                                     to={notification.path}
                                                     onClick={closeAllMenus}
-                                                    className={`block rounded-xl p-3 transition ${
-                                                        notification.unread
-                                                            ? 'bg-(--sj-primary)/5 hover:bg-(--sj-primary)/10'
-                                                            : 'hover:bg-(--sj-surface-2)'
-                                                    }`}
+                                                    className={`block rounded-xl p-3 transition ${notification.unread
+                                                        ? 'bg-(--sj-primary)/5 hover:bg-(--sj-primary)/10'
+                                                        : 'hover:bg-(--sj-surface-2)'
+                                                        }`}
                                                 >
                                                     <div className="flex items-start gap-3">
                                                         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-(--sj-primary)/10 text-(--sj-primary)">
                                                             {notification.id ===
-                                                            1 ? (
+                                                                1 ? (
                                                                 <Siren className="h-4 w-4" />
                                                             ) : notification.id ===
-                                                              2 ? (
+                                                                2 ? (
                                                                 <ShieldCheck className="h-4 w-4" />
                                                             ) : (
                                                                 <Hospital className="h-4 w-4" />
@@ -429,7 +444,7 @@ function HospitalNavbar() {
 
                                             <span className="text-xs font-bold text-(--sj-primary)">
                                                 {MOCK_HOSPITAL.status ===
-                                                'PENDING'
+                                                    'PENDING'
                                                     ? 'Verification pending'
                                                     : 'Hospital account active'}
                                             </span>
@@ -505,10 +520,12 @@ function HospitalNavbar() {
                                         <button
                                             type="button"
                                             onClick={handleSignOut}
-                                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-red-500 transition hover:bg-red-500/5"
+                                            disabled={isSigningOut}
+                                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-red-500 transition hover:bg-red-500/5 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             <LogOut className="h-4 w-4" />
-                                            Sign out
+
+                                            {isSigningOut ? 'Signing out...' : 'Sign out'}
                                         </button>
                                     </div>
                                 </div>
@@ -581,11 +598,10 @@ function HospitalNavbar() {
                                         key={item.label}
                                         to={item.path}
                                         onClick={closeAllMenus}
-                                        className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition ${
-                                            active
-                                                ? 'bg-(--sj-primary)/10 text-(--sj-primary)'
-                                                : 'text-(--sj-text-soft) hover:bg-(--sj-surface-2) hover:text-(--sj-text)'
-                                        }`}
+                                        className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition ${active
+                                            ? 'bg-(--sj-primary)/10 text-(--sj-primary)'
+                                            : 'text-(--sj-text-soft) hover:bg-(--sj-surface-2) hover:text-(--sj-text)'
+                                            }`}
                                     >
                                         <Icon className="h-4 w-4 shrink-0" />
 

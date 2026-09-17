@@ -7,6 +7,7 @@ import {
 } from 'react-router-dom';
 
 import { AuthProvider } from './context/AuthContext';
+import RoleRoute from './routes/RoleRoute';
 
 import HomePage from './pages/home/HomePage';
 
@@ -92,6 +93,7 @@ export default function App() {
         <AuthProvider>
             <BrowserRouter>
                 <Routes>
+
                     {/* =====================================================
                         PUBLIC
                     ===================================================== */}
@@ -160,32 +162,56 @@ export default function App() {
 
                     <Route
                         path="/dashboard/patient"
-                        element={<PatientDashboard />}
+                        element={
+                            <RoleRoute allowedRoles={['PATIENT']}>
+                                <PatientDashboard />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/patient/emergency"
-                        element={<EmergencyPage />}
+                        element={
+                            <RoleRoute allowedRoles={['PATIENT']}>
+                                <EmergencyPage />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/patient/medical-profile"
-                        element={<MedicalProfile />}
+                        element={
+                            <RoleRoute allowedRoles={['PATIENT']}>
+                                <MedicalProfile />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/patient/tracking"
-                        element={<TrackingPage />}
+                        element={
+                            <RoleRoute allowedRoles={['PATIENT']}>
+                                <TrackingPage />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/patient/emergency-contacts"
-                        element={<EmergencyContacts />}
+                        element={
+                            <RoleRoute allowedRoles={['PATIENT']}>
+                                <EmergencyContacts />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/patient/history"
-                        element={<EmergencyHistory />}
+                        element={
+                            <RoleRoute allowedRoles={['PATIENT']}>
+                                <EmergencyHistory />
+                            </RoleRoute>
+                        }
                     />
 
                     {/* =====================================================
@@ -194,42 +220,74 @@ export default function App() {
 
                     <Route
                         path="/dashboard/hospital"
-                        element={<HospitalDashboard />}
+                        element={
+                            <RoleRoute allowedRoles={['HOSPITAL_ADMIN']}>
+                                <HospitalDashboard />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/hospital/emergencies"
-                        element={<EmergencyRequests />}
+                        element={
+                            <RoleRoute allowedRoles={['HOSPITAL_ADMIN']}>
+                                <EmergencyRequests />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/hospital/emergencies/:emergencyId"
-                        element={<ActiveEmergency />}
+                        element={
+                            <RoleRoute allowedRoles={['HOSPITAL_ADMIN']}>
+                                <ActiveEmergency />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/hospital/ambulances"
-                        element={<Ambulances />}
+                        element={
+                            <RoleRoute allowedRoles={['HOSPITAL_ADMIN']}>
+                                <Ambulances />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/hospital/paramedics"
-                        element={<Paramedics />}
+                        element={
+                            <RoleRoute allowedRoles={['HOSPITAL_ADMIN']}>
+                                <Paramedics />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/hospital/capacity"
-                        element={<Capacity />}
+                        element={
+                            <RoleRoute allowedRoles={['HOSPITAL_ADMIN']}>
+                                <Capacity />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/hospital/services"
-                        element={<Services />}
+                        element={
+                            <RoleRoute allowedRoles={['HOSPITAL_ADMIN']}>
+                                <Services />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/hospital/settings"
-                        element={<HospitalSettings />}
+                        element={
+                            <RoleRoute allowedRoles={['HOSPITAL_ADMIN']}>
+                                <HospitalSettings />
+                            </RoleRoute>
+                        }
                     />
 
                     {/* =====================================================
@@ -238,37 +296,65 @@ export default function App() {
 
                     <Route
                         path="/dashboard/paramedic"
-                        element={<ParamedicDashboard />}
+                        element={
+                            <RoleRoute allowedRoles={['PARAMEDIC']}>
+                                <ParamedicDashboard />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/paramedic/emergency"
-                        element={<ActiveEmergencyParamedic />}
+                        element={
+                            <RoleRoute allowedRoles={['PARAMEDIC']}>
+                                <ActiveEmergencyParamedic />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/paramedic/emergency/:emergencyId"
-                        element={<ActiveEmergencyDetails />}
+                        element={
+                            <RoleRoute allowedRoles={['PARAMEDIC']}>
+                                <ActiveEmergencyDetails />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/paramedic/navigation"
-                        element={<Navigation />}
+                        element={
+                            <RoleRoute allowedRoles={['PARAMEDIC']}>
+                                <Navigation />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/paramedic/navigation/:emergencyId"
-                        element={<Navigation />}
+                        element={
+                            <RoleRoute allowedRoles={['PARAMEDIC']}>
+                                <Navigation />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/paramedic/history"
-                        element={<MissionHistory />}
+                        element={
+                            <RoleRoute allowedRoles={['PARAMEDIC']}>
+                                <MissionHistory />
+                            </RoleRoute>
+                        }
                     />
 
                     <Route
                         path="/dashboard/paramedic/profile"
-                        element={<ParamedicProfile />}
+                        element={
+                            <RoleRoute allowedRoles={['PARAMEDIC']}>
+                                <ParamedicProfile />
+                            </RoleRoute>
+                        }
                     />
 
                     {/* =====================================================
@@ -279,6 +365,7 @@ export default function App() {
                         path="*"
                         element={<Navigate to="/" replace />}
                     />
+
                 </Routes>
             </BrowserRouter>
         </AuthProvider>

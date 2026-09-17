@@ -14,9 +14,15 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 
 import AuthLayout from '../../layouts/AuthLayout';
+import { useAuth } from '../../context/AuthContext';
 
 function PatientRegister() {
     const navigate = useNavigate();
+
+    const {
+        registerPatient,
+        verifyRegistrationOTP,
+    } = useAuth();
 
     const [step, setStep] = React.useState('details');
     const [showPassword, setShowPassword] = React.useState(false);
@@ -42,16 +48,38 @@ function PatientRegister() {
     };
 
     const validateForm = () => {
-        if (!formData.fullName.trim()) {
+        const fullName = formData.fullName.trim();
+        const email = formData.email.trim();
+        const mobileDigits = formData.mobile.replace(/\D/g, '');
+
+        if (!fullName) {
             return 'Please enter your full name.';
         }
 
-        if (!formData.email.trim()) {
+        if (fullName.length < 2) {
+            return 'Full name must contain at least 2 characters.';
+        }
+
+        if (!email) {
             return 'Please enter your email address.';
         }
 
-        if (!formData.mobile.trim()) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return 'Please enter a valid email address.';
+        }
+
+        if (!mobileDigits) {
             return 'Please enter your mobile number.';
+        }
+
+        if (mobileDigits.length !== 10) {
+            return 'Please enter a complete 10-digit mobile number.';
+        }
+
+        if (!/^[6-9]\d{9}$/.test(mobileDigits)) {
+            return (
+                'Please enter a valid Indian mobile number starting with 6, 7, 8, or 9.'
+            );
         }
 
         if (!formData.password) {
@@ -73,7 +101,19 @@ function PatientRegister() {
         return '';
     };
 
-    const handleSubmit = (event) => {
+    const getMobileDigits = () => {
+        return formData.mobile.replace(/\D/g, '').slice(0, 10);
+    };
+
+    const handleMobileChange = (event) => {
+        const digitsOnly = event.target.value
+            .replace(/\D/g, '')
+            .slice(0, 10);
+
+        updateField('mobile', digitsOnly);
+    };
+
+    const handleSubmit = async (event) => {
         event.preventDefault();
 
         setError('');
@@ -87,53 +127,118 @@ function PatientRegister() {
 
         setLoading(true);
 
-        /*
-         * Temporary frontend-only registration flow.
-         *
-         * Later this will call the FastAPI backend:
-         * 1. Validate name, email, mobile and password.
-         * 2. Hash the password on the backend.
-         * 3. Create the user account.
-         * 4. Send mobile OTP.
-         * 5. Verify the OTP.
-         * 6. Activate the patient account.
-         */
+        try {
+            const mobileDigits = getMobileDigits();
 
-        setTimeout(() => {
-            setLoading(false);
+            await registerPatient({
+                full_name: formData.fullName.trim(),
+                email: formData.email.trim().toLowerCase(),
+                mobile_number: mobileDigits,
+                password: formData.password,
+                confirm_password: formData.confirmPassword,
+            });
+
+            setOtp('');
             setStep('otp');
-        }, 700);
+        } catch (requestError) {
+            console.error(
+                'Patient registration failed:',
+                requestError,
+            );
+
+            setError(
+                requestError?.message ||
+                'Unable to create your account. Please try again.',
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleVerifyOtp = (event) => {
+    const handleVerifyOtp = async (event) => {
         event.preventDefault();
 
         setError('');
 
         if (otp.length !== 6) {
-            setError('Please enter the 6-digit verification code.');
+            setError(
+                'Please enter the 6-digit verification code.',
+            );
             return;
         }
 
         setLoading(true);
 
-        /*
-         * Temporary frontend-only OTP verification.
-         *
-         * Later this will call the FastAPI OTP verification endpoint.
-         */
+        try {
+            const mobileDigits = getMobileDigits();
 
-        setTimeout(() => {
+            await verifyRegistrationOTP(
+                mobileDigits,
+                otp,
+            );
+
+            navigate(
+                '/register/patient/profile',
+                {
+                    replace: true,
+                },
+            );
+        } catch (requestError) {
+            console.error(
+                'Patient registration OTP verification failed:',
+                requestError,
+            );
+
+            setError(
+                requestError?.message ||
+                'Invalid or expired verification code. Please try again.',
+            );
+        } finally {
             setLoading(false);
+        }
+    };
 
-            /*
-             * For now we send the user to the patient dashboard.
-             *
-             * Later this should redirect to the first-login
-             * profile completion page before full dashboard access.
-             */
-            navigate('/register/patient/profile');
-        }, 700);
+    const handleResendOtp = async () => {
+        setError('');
+
+        const mobileDigits = getMobileDigits();
+
+        if (mobileDigits.length !== 10) {
+            setError(
+                'Your mobile number is incomplete. Please edit your details.',
+            );
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            await registerPatient({
+                full_name: formData.fullName.trim(),
+                email: formData.email.trim().toLowerCase(),
+                mobile_number: mobileDigits,
+                password: formData.password,
+                confirm_password: formData.confirmPassword,
+            });
+
+            setOtp('');
+
+            setError(
+                'A new verification code has been sent to your mobile number.',
+            );
+        } catch (requestError) {
+            console.error(
+                'Patient registration OTP resend failed:',
+                requestError,
+            );
+
+            setError(
+                requestError?.message ||
+                'Unable to resend the verification code.',
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -168,7 +273,10 @@ function PatientRegister() {
                         </p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="space-y-5"
+                    >
                         {/* Full name */}
                         <div>
                             <label
@@ -242,18 +350,19 @@ function PatientRegister() {
                                 <input
                                     id="patient-register-mobile"
                                     type="tel"
+                                    inputMode="numeric"
+                                    maxLength={10}
                                     value={formData.mobile}
-                                    onChange={(event) =>
-                                        updateField(
-                                            'mobile',
-                                            event.target.value,
-                                        )
-                                    }
-                                    placeholder="+91 98765 43210"
+                                    onChange={handleMobileChange}
+                                    placeholder="9876543210"
                                     autoComplete="tel"
                                     className="sj-input h-12 pl-11 pr-4 text-sm"
                                 />
                             </div>
+
+                            <p className="mt-2 text-xs text-(--sj-text-muted)">
+                                Enter a 10-digit Indian mobile number.
+                            </p>
                         </div>
 
                         {/* Password */}
@@ -269,7 +378,9 @@ function PatientRegister() {
                                 <input
                                     id="patient-register-password"
                                     type={
-                                        showPassword ? 'text' : 'password'
+                                        showPassword
+                                            ? 'text'
+                                            : 'password'
                                     }
                                     value={formData.password}
                                     onChange={(event) =>
@@ -432,7 +543,10 @@ function PatientRegister() {
                         </div>
                     </div>
 
-                    <form onSubmit={handleVerifyOtp} className="space-y-5">
+                    <form
+                        onSubmit={handleVerifyOtp}
+                        className="space-y-5"
+                    >
                         <div>
                             <label
                                 htmlFor="patient-register-otp"
@@ -486,12 +600,13 @@ function PatientRegister() {
                     <div className="mt-6 flex items-center justify-between text-xs">
                         <button
                             type="button"
+                            disabled={loading}
                             onClick={() => {
                                 setStep('details');
                                 setOtp('');
                                 setError('');
                             }}
-                            className="inline-flex items-center gap-1 font-bold text-(--sj-text-soft) hover:text-(--sj-text)"
+                            className="inline-flex items-center gap-1 font-bold text-(--sj-text-soft) hover:text-(--sj-text) disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <ArrowLeft className="h-3.5 w-3.5" />
                             Edit details
@@ -499,14 +614,13 @@ function PatientRegister() {
 
                         <button
                             type="button"
-                            onClick={() =>
-                                setError(
-                                    'A new verification code will be available after backend authentication is connected.',
-                                )
-                            }
-                            className="font-bold text-(--sj-primary) hover:underline"
+                            disabled={loading}
+                            onClick={handleResendOtp}
+                            className="font-bold text-(--sj-primary) hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            Resend code
+                            {loading
+                                ? 'Sending...'
+                                : 'Resend code'}
                         </button>
                     </div>
 

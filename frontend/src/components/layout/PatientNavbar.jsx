@@ -20,13 +20,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.png';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-
-const MOCK_PATIENT = {
-    name: 'Ananya Sharma',
-    email: 'ananya.sharma@example.com',
-    phone: '+91 98765 43210',
-    status: 'ACTIVE',
-};
+import { patientService } from '../../services/patientService';
 
 const NAV_ITEMS = [
     {
@@ -56,36 +50,9 @@ const NAV_ITEMS = [
     },
 ];
 
-const MOCK_NOTIFICATIONS = [
-    {
-        id: 1,
-        title: 'Emergency coordination ready',
-        message:
-            'Your emergency request can be coordinated when SOS is activated.',
-        time: 'Just now',
-        unread: true,
-    },
-    {
-        id: 2,
-        title: 'Medical profile reminder',
-        message:
-            'Keeping your medical information updated can help emergency teams.',
-        time: '2 hours ago',
-        unread: true,
-    },
-    {
-        id: 3,
-        title: 'Emergency contacts',
-        message:
-            'Make sure your primary emergency contact information is current.',
-        time: 'Yesterday',
-        unread: false,
-    },
-];
-
 function PatientNavbar() {
     const { theme, toggleTheme } = useTheme();
-    const { logout } = useAuth();
+    const { user, logout } = useAuth();
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -95,8 +62,17 @@ function PatientNavbar() {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
 
-    const [notifications, setNotifications] =
-        useState(MOCK_NOTIFICATIONS);
+    const [patientProfile, setPatientProfile] = useState(null);
+    const [profileLoading, setProfileLoading] = useState(true);
+
+    /*
+     * Notifications will be connected to the real notifications API
+     * once that backend module is implemented.
+     *
+     * Keeping this empty prevents displaying fake medical/emergency
+     * notifications to the patient.
+     */
+    const [notifications] = useState([]);
 
     const notificationRef = useRef(null);
     const profileRef = useRef(null);
@@ -104,6 +80,63 @@ function PatientNavbar() {
     const unreadCount = notifications.filter(
         (notification) => notification.unread,
     ).length;
+
+    useEffect(() => {
+        let isMounted = true;
+
+        async function loadPatientProfile() {
+            setProfileLoading(true);
+
+            try {
+                const accessToken = localStorage.getItem(
+                    'sanjeevani_access_token',
+                );
+
+                if (!accessToken) {
+                    if (isMounted) {
+                        setPatientProfile(null);
+                    }
+
+                    return;
+                }
+
+                const response = await patientService.getProfile(
+                    accessToken,
+                );
+
+                if (isMounted) {
+                    setPatientProfile(response);
+                }
+            } catch (error) {
+                /*
+                 * A missing profile is valid during onboarding.
+                 * Do not show an error banner inside the navbar.
+                 */
+                if (error?.status === 404) {
+                    if (isMounted) {
+                        setPatientProfile(null);
+                    }
+
+                    return;
+                }
+
+                console.warn(
+                    'Unable to load patient profile for navbar.',
+                    error,
+                );
+            } finally {
+                if (isMounted) {
+                    setProfileLoading(false);
+                }
+            }
+        }
+
+        loadPatientProfile();
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     useEffect(() => {
         const handleOutsideClick = (event) => {
@@ -163,25 +196,17 @@ function PatientNavbar() {
     };
 
     const handleReadAll = () => {
-        setNotifications((currentNotifications) =>
-            currentNotifications.map((notification) => ({
-                ...notification,
-                unread: false,
-            })),
-        );
+        /*
+         * Notifications are currently read-only until the real
+         * notification API is connected.
+         */
     };
 
-    const handleNotificationClick = (notificationId) => {
-        setNotifications((currentNotifications) =>
-            currentNotifications.map((notification) =>
-                notification.id === notificationId
-                    ? {
-                          ...notification,
-                          unread: false,
-                      }
-                    : notification,
-            ),
-        );
+    const handleNotificationClick = () => {
+        /*
+         * Notification navigation will be connected when the
+         * notification backend is implemented.
+         */
     };
 
     const handleSignOut = async () => {
@@ -214,11 +239,49 @@ function PatientNavbar() {
         setIsNotificationOpen(false);
     };
 
+    /*
+     * AuthContext contains the actual account identity.
+     * Patient profile contains the additional patient-specific data.
+     */
+    const patientName =
+        user?.full_name?.trim() ||
+        'Patient';
+
+    const patientEmail =
+        user?.email?.trim() ||
+        'Email not provided';
+
+    const patientPhone =
+        user?.mobile_number?.trim() ||
+        'Phone not provided';
+
+    const patientStatus =
+        user?.status || 'ACTIVE';
+
+    const patientCity =
+        patientProfile?.city ||
+        'Location not provided';
+
+    const patientState =
+        patientProfile?.state ||
+        '';
+
+    const displayLocation = patientState
+        ? `${patientCity}, ${patientState}`
+        : patientCity;
+
+    const accountIsActive =
+        patientStatus === 'ACTIVE' &&
+        user?.is_active !== false;
+
     return (
         <header className="sticky top-0 z-50 border-b border-(--sj-border) bg-(--sj-surface)/95 shadow-[0_1px_8px_rgba(16,33,43,0.04)] backdrop-blur-xl">
             <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
                 <div className="flex h-18 items-center justify-between gap-3">
-                    {/* Brand */}
+                    {/* =================================================
+                        BRAND
+                    ================================================= */}
+
                     <button
                         type="button"
                         onClick={() =>
@@ -245,7 +308,10 @@ function PatientNavbar() {
                         </div>
                     </button>
 
-                    {/* Desktop Navigation */}
+                    {/* =================================================
+                        DESKTOP NAVIGATION
+                    ================================================= */}
+
                     <nav className="hidden items-center gap-1 xl:flex">
                         {NAV_ITEMS.map((item) => {
                             const Icon = item.icon;
@@ -271,9 +337,13 @@ function PatientNavbar() {
                         })}
                     </nav>
 
-                    {/* Right Actions */}
+                    {/* =================================================
+                        RIGHT ACTIONS
+                    ================================================= */}
+
                     <div className="flex min-w-0 items-center gap-1">
                         {/* SOS */}
+
                         <button
                             type="button"
                             onClick={() =>
@@ -287,7 +357,10 @@ function PatientNavbar() {
                             <span>SOS</span>
                         </button>
 
-                        {/* Notifications */}
+                        {/* =================================================
+                            NOTIFICATIONS
+                        ================================================= */}
+
                         <div
                             className="relative"
                             ref={notificationRef}
@@ -376,15 +449,17 @@ function PatientNavbar() {
                                                 ),
                                             )
                                         ) : (
-                                            <div className="px-4 py-8 text-center">
+                                            <div className="px-4 py-9 text-center">
                                                 <Bell className="mx-auto h-7 w-7 text-(--sj-text-muted)" />
 
-                                                <p className="mt-2 text-sm font-semibold text-(--sj-text)">
+                                                <p className="mt-3 text-sm font-semibold text-(--sj-text)">
                                                     No notifications
                                                 </p>
 
-                                                <p className="mt-1 text-xs text-(--sj-text-muted)">
+                                                <p className="mt-1 text-xs leading-5 text-(--sj-text-muted)">
                                                     You are all caught up.
+                                                    New safety and emergency
+                                                    updates will appear here.
                                                 </p>
                                             </div>
                                         )}
@@ -393,7 +468,10 @@ function PatientNavbar() {
                             )}
                         </div>
 
-                        {/* Theme */}
+                        {/* =================================================
+                            THEME
+                        ================================================= */}
+
                         <button
                             type="button"
                             onClick={toggleTheme}
@@ -411,7 +489,10 @@ function PatientNavbar() {
                             )}
                         </button>
 
-                        {/* Profile Button */}
+                        {/* =================================================
+                            PROFILE BUTTON
+                        ================================================= */}
+
                         <div
                             className="relative hidden md:block"
                             ref={profileRef}
@@ -427,7 +508,7 @@ function PatientNavbar() {
 
                                 <div className="hidden max-w-32.5 text-left lg:block">
                                     <p className="truncate text-xs font-bold text-(--sj-text)">
-                                        {MOCK_PATIENT.name}
+                                        {patientName}
                                     </p>
 
                                     <p className="truncate text-[10px] text-(--sj-text-muted)">
@@ -438,10 +519,14 @@ function PatientNavbar() {
                                 <ChevronDown className="hidden h-4 w-4 text-(--sj-text-muted) lg:block" />
                             </button>
 
-                            {/* Profile Dropdown */}
+                            {/* =================================================
+                                PROFILE DROPDOWN
+                            ================================================= */}
+
                             {isProfileOpen && (
                                 <div className="fixed left-4 right-4 top-19 z-60 overflow-hidden rounded-2xl border border-(--sj-border) bg-(--sj-surface) shadow-xl sm:left-auto sm:right-4 sm:w-80 md:absolute md:left-auto md:right-0 md:top-[calc(100%+10px)]">
                                     {/* Patient Identity */}
+
                                     <div className="border-b border-(--sj-border) px-4 py-4">
                                         <div className="flex items-center gap-3">
                                             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-(--sj-primary-soft) text-(--sj-primary)">
@@ -450,15 +535,15 @@ function PatientNavbar() {
 
                                             <div className="min-w-0">
                                                 <p className="truncate text-sm font-bold text-(--sj-text)">
-                                                    {MOCK_PATIENT.name}
+                                                    {patientName}
                                                 </p>
 
                                                 <p className="mt-0.5 truncate text-xs text-(--sj-text-muted)">
-                                                    {MOCK_PATIENT.email}
+                                                    {patientEmail}
                                                 </p>
 
-                                                <p className="mt-0.5 text-xs text-(--sj-text-muted)">
-                                                    {MOCK_PATIENT.phone}
+                                                <p className="mt-0.5 truncate text-xs text-(--sj-text-muted)">
+                                                    {patientPhone}
                                                 </p>
                                             </div>
                                         </div>
@@ -467,12 +552,29 @@ function PatientNavbar() {
                                             <ShieldCheck className="h-4 w-4 shrink-0 text-(--sj-primary)" />
 
                                             <span className="text-xs font-semibold text-(--sj-primary)">
-                                                Patient account active
+                                                {accountIsActive
+                                                    ? 'Patient account active'
+                                                    : 'Patient account inactive'}
+                                            </span>
+                                        </div>
+
+                                        {/* Saved Location */}
+
+                                        <div className="mt-2 flex items-center gap-2 rounded-lg bg-(--sj-surface-2) px-3 py-2">
+                                            <MapPinIcon
+                                                className="h-4 w-4 shrink-0 text-(--sj-text-muted)"
+                                            />
+
+                                            <span className="truncate text-xs font-medium text-(--sj-text-soft)">
+                                                {profileLoading
+                                                    ? 'Loading location...'
+                                                    : displayLocation}
                                             </span>
                                         </div>
                                     </div>
 
                                     {/* Profile Sections */}
+
                                     <div className="p-2">
                                         <button
                                             type="button"
@@ -484,7 +586,9 @@ function PatientNavbar() {
                                             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
                                         >
                                             <FileHeart className="h-4 w-4 shrink-0" />
-                                            <span>Medical profile</span>
+                                            <span>
+                                                Medical profile
+                                            </span>
                                         </button>
 
                                         <button
@@ -538,7 +642,10 @@ function PatientNavbar() {
                             )}
                         </div>
 
-                        {/* Mobile / Tablet Menu */}
+                        {/* =================================================
+                            MOBILE / TABLET MENU
+                        ================================================= */}
+
                         <button
                             type="button"
                             onClick={() =>
@@ -562,7 +669,10 @@ function PatientNavbar() {
                     </div>
                 </div>
 
-                {/* Mobile / Tablet Navigation */}
+                {/* =========================================================
+                    MOBILE / TABLET NAVIGATION
+                ========================================================= */}
+
                 {isMobileMenuOpen && (
                     <div className="border-t border-(--sj-border) py-3 xl:hidden">
                         <nav className="grid gap-1">
@@ -584,12 +694,14 @@ function PatientNavbar() {
                                         }`}
                                     >
                                         <Icon className="h-5 w-5 shrink-0" />
+
                                         <span>{item.label}</span>
                                     </button>
                                 );
                             })}
 
                             {/* SOS */}
+
                             <button
                                 type="button"
                                 onClick={() =>
@@ -604,6 +716,7 @@ function PatientNavbar() {
                             </button>
 
                             {/* Mobile Controls */}
+
                             <div className="mt-2 border-t border-(--sj-border) pt-2">
                                 <button
                                     type="button"
@@ -641,6 +754,28 @@ function PatientNavbar() {
                 )}
             </div>
         </header>
+    );
+}
+
+/*
+ * Small local icon wrapper so the existing navbar doesn't need
+ * another lucide import just for the profile location row.
+ */
+function MapPinIcon({ className }) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={className}
+            aria-hidden="true"
+        >
+            <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
+            <circle cx="12" cy="10" r="3" />
+        </svg>
     );
 }
 

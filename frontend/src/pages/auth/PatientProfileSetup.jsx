@@ -13,6 +13,11 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 
 import AuthLayout from '../../layouts/AuthLayout';
+import {
+    createPatientProfile,
+    getPatientProfile,
+    updatePatientProfile,
+} from '../../services/patientService';
 
 const PREGNANCY_MIN_AGE = 13;
 const PREGNANCY_MAX_AGE = 55;
@@ -32,7 +37,8 @@ function calculateAge(dateOfBirth) {
 
     let age = today.getFullYear() - birthDate.getFullYear();
 
-    const monthDifference = today.getMonth() - birthDate.getMonth();
+    const monthDifference =
+        today.getMonth() - birthDate.getMonth();
 
     if (
         monthDifference < 0 ||
@@ -45,11 +51,54 @@ function calculateAge(dateOfBirth) {
     return age;
 }
 
+function formatApiError(error) {
+    if (!error) {
+        return 'Something went wrong while saving your profile.';
+    }
+
+    if (
+        error.data &&
+        Array.isArray(error.data.detail)
+    ) {
+        const messages = error.data.detail
+            .map((item) => {
+                if (typeof item === 'string') {
+                    return item;
+                }
+
+                if (item?.msg) {
+                    return item.msg;
+                }
+
+                return null;
+            })
+            .filter(Boolean);
+
+        if (messages.length > 0) {
+            return messages.join(' ');
+        }
+    }
+
+    if (typeof error.data?.detail === 'string') {
+        return error.data.detail;
+    }
+
+    if (error.message) {
+        return error.message;
+    }
+
+    return 'Something went wrong while saving your profile.';
+}
+
 function PatientProfileSetup() {
     const navigate = useNavigate();
 
     const [section, setSection] = React.useState(0);
     const [loading, setLoading] = React.useState(false);
+    const [loadingProfile, setLoadingProfile] =
+        React.useState(true);
+    const [hasExistingProfile, setHasExistingProfile] =
+        React.useState(false);
     const [error, setError] = React.useState('');
 
     const [formData, setFormData] = React.useState({
@@ -111,12 +160,128 @@ function PatientProfileSetup() {
         patientAge >= PREGNANCY_MIN_AGE &&
         patientAge <= PREGNANCY_MAX_AGE;
 
+    /*
+     * Load the patient's existing profile when this page opens.
+     *
+     * A 404 is expected for a brand-new patient, so we silently keep
+     * the empty form in that case.
+     */
     React.useEffect(() => {
-        /*
-         * If the patient changes their DOB or gender and pregnancy status
-         * is no longer relevant, clear the previously selected value.
-         */
-        if (!shouldAskPregnancyStatus && formData.pregnancyStatus) {
+        let isMounted = true;
+
+        const loadProfile = async () => {
+            setLoadingProfile(true);
+            setError('');
+
+            try {
+                const profile = await getPatientProfile();
+
+                if (!isMounted || !profile) {
+                    return;
+                }
+
+                const primaryContact =
+                    profile.emergency_contacts?.find(
+                        (contact) => contact.is_primary,
+                    ) ||
+                    profile.emergency_contacts?.[0] ||
+                    null;
+
+                const medicalProfile =
+                    profile.medical_profile || {};
+
+                setFormData({
+                    dob: profile.date_of_birth || '',
+                    gender: profile.gender || '',
+                    bloodGroup: profile.blood_group || '',
+
+                    emergencyContactName:
+                        primaryContact?.name || '',
+                    emergencyContactRelation:
+                        primaryContact?.relationship || '',
+                    emergencyContactNumber:
+                        primaryContact?.mobile_number || '',
+
+                    allergies:
+                        medicalProfile.allergies || '',
+                    chronicConditions:
+                        medicalProfile.chronic_conditions || '',
+                    currentMedications:
+                        medicalProfile.current_medications || '',
+                    majorSurgeries:
+                        medicalProfile.major_surgeries || '',
+                    disabilities:
+                        medicalProfile.disabilities || '',
+                    pregnancyStatus:
+                        profile.pregnancy_status || '',
+
+                    height:
+                        profile.height_cm !== null &&
+                        profile.height_cm !== undefined
+                            ? String(profile.height_cm)
+                            : '',
+
+                    weight:
+                        profile.weight_kg !== null &&
+                        profile.weight_kg !== undefined
+                            ? String(profile.weight_kg)
+                            : '',
+
+                    address: profile.address || '',
+                    city: profile.city || '',
+                    state: profile.state || '',
+                    pincode: profile.pincode || '',
+
+                    medicalSharingAccepted:
+                        Boolean(
+                            profile.medical_sharing_accepted,
+                        ),
+
+                    termsAccepted: Boolean(
+                        profile.terms_accepted,
+                    ),
+                });
+
+                setHasExistingProfile(true);
+            } catch (profileError) {
+                /*
+                 * A 404 simply means this is a new patient.
+                 * We do not show an error for that case.
+                 */
+                if (profileError?.status !== 404) {
+                    if (isMounted) {
+                        setError(
+                            formatApiError(profileError),
+                        );
+                    }
+                }
+
+                if (isMounted) {
+                    setHasExistingProfile(false);
+                }
+            } finally {
+                if (isMounted) {
+                    setLoadingProfile(false);
+                }
+            }
+        };
+
+        loadProfile();
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    /*
+     * If the patient changes their DOB or gender and pregnancy status
+     * is no longer relevant, clear the previously selected value.
+     */
+    React.useEffect(() => {
+        if (
+            !shouldAskPregnancyStatus &&
+            formData.pregnancyStatus
+        ) {
             setFormData((current) => ({
                 ...current,
                 pregnancyStatus: '',
@@ -140,7 +305,10 @@ function PatientProfileSetup() {
                 return 'Please enter your date of birth.';
             }
 
-            if (patientAge === null || patientAge < 0) {
+            if (
+                patientAge === null ||
+                patientAge < 0
+            ) {
                 return 'Please enter a valid date of birth.';
             }
 
@@ -160,14 +328,77 @@ function PatientProfileSetup() {
                 return 'Please select your relationship with the emergency contact.';
             }
 
-            if (!formData.emergencyContactNumber.trim()) {
+            if (
+                !formData.emergencyContactNumber.trim()
+            ) {
                 return 'Please enter the emergency contact number.';
+            }
+
+            const contactDigits =
+                formData.emergencyContactNumber.replace(
+                    /\D/g,
+                    '',
+                );
+
+            if (contactDigits.length !== 10) {
+                return 'Please enter a valid 10-digit emergency contact number.';
+            }
+
+            if (
+                !contactDigits.startsWith(
+                    '6',
+                ) &&
+                !contactDigits.startsWith(
+                    '7',
+                ) &&
+                !contactDigits.startsWith(
+                    '8',
+                ) &&
+                !contactDigits.startsWith(
+                    '9',
+                )
+            ) {
+                return 'Please enter a valid Indian mobile number.';
             }
 
             return '';
         }
 
         if (section === 2) {
+            if (
+                formData.height &&
+                (
+                    Number(formData.height) < 30 ||
+                    Number(formData.height) > 250
+                )
+            ) {
+                return 'Height must be between 30 cm and 250 cm.';
+            }
+
+            if (
+                formData.weight &&
+                (
+                    Number(formData.weight) < 1 ||
+                    Number(formData.weight) > 500
+                )
+            ) {
+                return 'Weight must be between 1 kg and 500 kg.';
+            }
+
+            if (
+                formData.height &&
+                Number.isNaN(Number(formData.height))
+            ) {
+                return 'Please enter a valid height.';
+            }
+
+            if (
+                formData.weight &&
+                Number.isNaN(Number(formData.weight))
+            ) {
+                return 'Please enter a valid weight.';
+            }
+
             return '';
         }
 
@@ -239,7 +470,78 @@ function PatientProfileSetup() {
         }
     };
 
-    const handleComplete = () => {
+    const buildProfilePayload = () => {
+        return {
+            date_of_birth: formData.dob,
+            gender: formData.gender || null,
+            blood_group:
+                formData.bloodGroup || null,
+
+            height_cm: formData.height
+                ? Number(formData.height)
+                : null,
+
+            weight_kg: formData.weight
+                ? Number(formData.weight)
+                : null,
+
+            address: formData.address.trim() || null,
+            city: formData.city.trim(),
+            state: formData.state.trim(),
+            pincode: formData.pincode.trim(),
+
+            pregnancy_status:
+                shouldAskPregnancyStatus &&
+                formData.pregnancyStatus
+                    ? formData.pregnancyStatus
+                    : null,
+
+            medical_sharing_accepted:
+                formData.medicalSharingAccepted,
+
+            terms_accepted:
+                formData.termsAccepted,
+
+            emergency_contact: {
+                name:
+                    formData.emergencyContactName.trim(),
+
+                relationship:
+                    formData.emergencyContactRelation,
+
+                mobile_number:
+                    formData.emergencyContactNumber.replace(
+                        /\D/g,
+                        '',
+                    ),
+
+                is_primary: true,
+            },
+
+            medical_profile: {
+                allergies:
+                    formData.allergies.trim() || null,
+
+                chronic_conditions:
+                    formData.chronicConditions.trim() ||
+                    null,
+
+                current_medications:
+                    formData.currentMedications.trim() ||
+                    null,
+
+                major_surgeries:
+                    formData.majorSurgeries.trim() ||
+                    null,
+
+                disabilities:
+                    formData.disabilities.trim() ||
+                    null,
+            },
+        };
+    };
+
+    const handleComplete = async () => {
         setError('');
 
         const validationError = validateSection();
@@ -249,27 +551,56 @@ function PatientProfileSetup() {
             return;
         }
 
+        if (loading) {
+            return;
+        }
+
         setLoading(true);
 
-        /*
-         * Temporary frontend-only profile completion.
-         *
-         * Later this will call the FastAPI backend to:
-         *
-         * 1. Save patient profile information.
-         * 2. Save emergency contact.
-         * 3. Save medical profile.
-         * 4. Save address/location.
-         * 5. Save emergency medical-data consent.
-         * 6. Save pregnancy status only when relevant.
-         * 7. Mark patient onboarding as completed.
-         */
+        try {
+            const payload = buildProfilePayload();
 
-        setTimeout(() => {
+            if (hasExistingProfile) {
+                await updatePatientProfile(
+                    payload,
+                );
+            } else {
+                await createPatientProfile(
+                    payload,
+                );
+
+                setHasExistingProfile(true);
+            }
+
+            navigate('/dashboard/patient', {
+                replace: true,
+            });
+        } catch (saveError) {
+            setError(formatApiError(saveError));
+        } finally {
             setLoading(false);
-            navigate('/dashboard/patient');
-        }, 800);
+        }
     };
+
+    if (loadingProfile) {
+        return (
+            <AuthLayout
+                eyebrow="Emergency profile setup"
+                title="Let's make your profile emergency-ready."
+                description="Loading your saved emergency profile..."
+            >
+                <div className="flex min-h-64 items-center justify-center">
+                    <div className="text-center">
+                        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-(--sj-primary)/20 border-t-(--sj-primary)" />
+
+                        <p className="mt-4 text-sm font-semibold text-(--sj-text-soft)">
+                            Loading your profile...
+                        </p>
+                    </div>
+                </div>
+            </AuthLayout>
+        );
+    }
 
     return (
         <AuthLayout
@@ -298,13 +629,14 @@ function PatientProfileSetup() {
 
                     <div className="hidden h-12 w-12 items-center justify-center rounded-full bg-(--sj-primary)/10 text-sm font-black text-(--sj-primary) sm:flex">
                         {Math.round(
-                            ((section + 1) / sections.length) * 100,
+                            ((section + 1) /
+                                sections.length) *
+                                100,
                         )}
                         %
                     </div>
                 </div>
 
-                
                 {/* Section indicators */}
                 <div className="mt-5 grid grid-cols-5 gap-1">
                     {sections.map((item, index) => (
@@ -355,7 +687,6 @@ function PatientProfileSetup() {
                         </p>
                     </div>
 
-                    {/* Date of birth */}
                     <div>
                         <label
                             htmlFor="patient-dob"
@@ -381,14 +712,14 @@ function PatientProfileSetup() {
                             />
                         </div>
 
-                        {patientAge !== null && patientAge >= 0 && (
-                            <p className="mt-2 text-xs text-(--sj-text-muted)">
-                                Age: {patientAge} years
-                            </p>
-                        )}
+                        {patientAge !== null &&
+                            patientAge >= 0 && (
+                                <p className="mt-2 text-xs text-(--sj-text-muted)">
+                                    Age: {patientAge} years
+                                </p>
+                            )}
                     </div>
 
-                    {/* Gender */}
                     <div>
                         <label
                             htmlFor="patient-gender"
@@ -426,7 +757,6 @@ function PatientProfileSetup() {
                         </select>
                     </div>
 
-                    {/* Blood group */}
                     <div>
                         <label
                             htmlFor="patient-blood-group"
@@ -489,7 +819,9 @@ function PatientProfileSetup() {
                         <input
                             id="emergency-contact-name"
                             type="text"
-                            value={formData.emergencyContactName}
+                            value={
+                                formData.emergencyContactName
+                            }
                             onChange={(event) =>
                                 updateField(
                                     'emergencyContactName',
@@ -511,7 +843,9 @@ function PatientProfileSetup() {
 
                         <select
                             id="emergency-contact-relation"
-                            value={formData.emergencyContactRelation}
+                            value={
+                                formData.emergencyContactRelation
+                            }
                             onChange={(event) =>
                                 updateField(
                                     'emergencyContactRelation',
@@ -568,7 +902,9 @@ function PatientProfileSetup() {
                             <input
                                 id="emergency-contact-number"
                                 type="tel"
-                                value={formData.emergencyContactNumber}
+                                value={
+                                    formData.emergencyContactNumber
+                                }
                                 onChange={(event) =>
                                     updateField(
                                         'emergencyContactNumber',
@@ -598,7 +934,6 @@ function PatientProfileSetup() {
                         </p>
                     </div>
 
-                    {/* Allergies */}
                     <div>
                         <label
                             htmlFor="patient-allergies"
@@ -622,7 +957,6 @@ function PatientProfileSetup() {
                         />
                     </div>
 
-                    {/* Chronic conditions */}
                     <div>
                         <label
                             htmlFor="patient-chronic-conditions"
@@ -633,7 +967,9 @@ function PatientProfileSetup() {
 
                         <textarea
                             id="patient-chronic-conditions"
-                            value={formData.chronicConditions}
+                            value={
+                                formData.chronicConditions
+                            }
                             onChange={(event) =>
                                 updateField(
                                     'chronicConditions',
@@ -646,7 +982,6 @@ function PatientProfileSetup() {
                         />
                     </div>
 
-                    {/* Current medications */}
                     <div>
                         <label
                             htmlFor="patient-medications"
@@ -657,7 +992,9 @@ function PatientProfileSetup() {
 
                         <textarea
                             id="patient-medications"
-                            value={formData.currentMedications}
+                            value={
+                                formData.currentMedications
+                            }
                             onChange={(event) =>
                                 updateField(
                                     'currentMedications',
@@ -670,7 +1007,6 @@ function PatientProfileSetup() {
                         />
                     </div>
 
-                    {/* Major surgeries */}
                     <div>
                         <label
                             htmlFor="patient-surgeries"
@@ -681,7 +1017,9 @@ function PatientProfileSetup() {
 
                         <textarea
                             id="patient-surgeries"
-                            value={formData.majorSurgeries}
+                            value={
+                                formData.majorSurgeries
+                            }
                             onChange={(event) =>
                                 updateField(
                                     'majorSurgeries',
@@ -694,7 +1032,6 @@ function PatientProfileSetup() {
                         />
                     </div>
 
-                    {/* Disabilities */}
                     <div>
                         <label
                             htmlFor="patient-disabilities"
@@ -705,7 +1042,9 @@ function PatientProfileSetup() {
 
                         <textarea
                             id="patient-disabilities"
-                            value={formData.disabilities}
+                            value={
+                                formData.disabilities
+                            }
                             onChange={(event) =>
                                 updateField(
                                     'disabilities',
@@ -718,7 +1057,6 @@ function PatientProfileSetup() {
                         />
                     </div>
 
-                    {/* Conditional pregnancy status */}
                     {shouldAskPregnancyStatus && (
                         <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) p-4">
                             <label
@@ -735,7 +1073,9 @@ function PatientProfileSetup() {
 
                             <select
                                 id="patient-pregnancy"
-                                value={formData.pregnancyStatus}
+                                value={
+                                    formData.pregnancyStatus
+                                }
                                 onChange={(event) =>
                                     updateField(
                                         'pregnancyStatus',
@@ -759,7 +1099,6 @@ function PatientProfileSetup() {
                         </div>
                     )}
 
-                    {/* Height + weight */}
                     <div className="grid gap-5 sm:grid-cols-2">
                         <div>
                             <label
@@ -839,7 +1178,6 @@ function PatientProfileSetup() {
                         </p>
                     </div>
 
-                    {/* Address */}
                     <div>
                         <label
                             htmlFor="patient-address"
@@ -864,7 +1202,6 @@ function PatientProfileSetup() {
                     </div>
 
                     <div className="grid gap-5 sm:grid-cols-2">
-                        {/* City */}
                         <div>
                             <label
                                 htmlFor="patient-city"
@@ -888,7 +1225,6 @@ function PatientProfileSetup() {
                             />
                         </div>
 
-                        {/* State */}
                         <div>
                             <label
                                 htmlFor="patient-state"
@@ -912,7 +1248,6 @@ function PatientProfileSetup() {
                             />
                         </div>
 
-                        {/* Pincode */}
                         <div className="sm:col-span-2">
                             <label
                                 htmlFor="patient-pincode"
@@ -963,7 +1298,6 @@ function PatientProfileSetup() {
                         </div>
                     </div>
 
-                    {/* Personal summary */}
                     <div className="sj-card p-4">
                         <div className="flex items-center justify-between">
                             <div>
@@ -1007,8 +1341,9 @@ function PatientProfileSetup() {
                                     Gender
                                 </p>
 
-                                <p className="mt-1 font-semibold text-(--sj-text)">
-                                    {formData.gender || 'Not specified'}
+                                <p className="mt-1 font-semibold capitalize text-(--sj-text)">
+                                    {formData.gender ||
+                                        'Not specified'}
                                 </p>
                             </div>
 
@@ -1030,15 +1365,19 @@ function PatientProfileSetup() {
                                     </p>
 
                                     <p className="mt-1 font-semibold text-(--sj-text)">
-                                        {formData.pregnancyStatus ||
-                                            'Not specified'}
+                                        {formData.pregnancyStatus ===
+                                        'pregnant'
+                                            ? 'Pregnant'
+                                            : formData.pregnancyStatus ===
+                                                'not_pregnant'
+                                              ? 'Not pregnant'
+                                              : 'Not specified'}
                                     </p>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Emergency summary */}
                     <div className="sj-card p-4">
                         <div className="flex items-center justify-between">
                             <div>
@@ -1074,7 +1413,6 @@ function PatientProfileSetup() {
                         </p>
                     </div>
 
-                    {/* Medical summary */}
                     <div className="sj-card p-4">
                         <div className="flex items-center justify-between">
                             <div>
@@ -1140,15 +1478,19 @@ function PatientProfileSetup() {
 
                                 <p className="mt-1 font-semibold text-(--sj-text)">
                                     {shouldAskPregnancyStatus
-                                        ? formData.pregnancyStatus ||
-                                          'Not specified'
+                                        ? formData.pregnancyStatus ===
+                                          'pregnant'
+                                            ? 'Pregnant'
+                                            : formData.pregnancyStatus ===
+                                                'not_pregnant'
+                                              ? 'Not pregnant'
+                                              : 'Not specified'
                                         : 'Not applicable'}
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    {/* Address summary */}
                     <div className="sj-card p-4">
                         <div className="flex items-center justify-between">
                             <div>
@@ -1157,7 +1499,11 @@ function PatientProfileSetup() {
                                 </p>
 
                                 <p className="mt-1 text-sm font-bold text-(--sj-text)">
-                                    {formData.city}, {formData.state}
+                                    {formData.city ||
+                                        'City not entered'}
+                                    {formData.state
+                                        ? `, ${formData.state}`
+                                        : ''}
                                 </p>
                             </div>
 
@@ -1175,12 +1521,14 @@ function PatientProfileSetup() {
 
                         <p className="mt-2 text-xs text-(--sj-text-soft)">
                             {formData.address ||
-                                'Address not provided'}{' '}
-                            · {formData.pincode}
+                                'Address not provided'}
+
+                            {formData.pincode
+                                ? ` · ${formData.pincode}`
+                                : ''}
                         </p>
                     </div>
 
-                    {/* Consent */}
                     <div className="space-y-4 border-t border-(--sj-border) pt-5">
                         <label className="flex cursor-pointer items-start gap-3">
                             <input
@@ -1208,7 +1556,9 @@ function PatientProfileSetup() {
                         <label className="flex cursor-pointer items-start gap-3">
                             <input
                                 type="checkbox"
-                                checked={formData.termsAccepted}
+                                checked={
+                                    formData.termsAccepted
+                                }
                                 onChange={(event) =>
                                     updateField(
                                         'termsAccepted',
@@ -1252,7 +1602,8 @@ function PatientProfileSetup() {
                     <button
                         type="button"
                         onClick={handleBack}
-                        className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-(--sj-border) px-4 text-sm font-bold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
+                        disabled={loading}
+                        className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-(--sj-border) px-4 text-sm font-bold text-(--sj-text-soft) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text) disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <ArrowLeft className="h-4 w-4" />
                         Back
@@ -1263,7 +1614,8 @@ function PatientProfileSetup() {
                     <button
                         type="button"
                         onClick={handleNext}
-                        className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-(--sj-primary) px-4 text-sm font-bold text-white shadow-sm transition hover:bg-(--sj-primary-dark)"
+                        disabled={loading}
+                        className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-(--sj-primary) px-4 text-sm font-bold text-white shadow-sm transition hover:bg-(--sj-primary-dark) disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         Continue
                         <ArrowRight className="h-4 w-4" />
@@ -1279,7 +1631,10 @@ function PatientProfileSetup() {
                             'Saving profile...'
                         ) : (
                             <>
-                                Complete profile
+                                {hasExistingProfile
+                                    ? 'Update profile'
+                                    : 'Complete profile'}
+
                                 <CheckCircle2 className="h-4 w-4" />
                             </>
                         )}

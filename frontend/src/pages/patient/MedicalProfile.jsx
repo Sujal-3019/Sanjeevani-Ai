@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-    ArrowLeft,
     CalendarDays,
     Check,
     Edit3,
@@ -13,30 +12,42 @@ import {
     UserRound,
     X,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+
 import PatientNavbar from '../../components/layout/PatientNavbar';
+import { useAuth } from '../../context/AuthContext';
+import {
+    getPatientProfile,
+    updatePatientProfile,
+} from '../../services/patientService';
+
+const ACCESS_TOKEN_KEY = 'sanjeevani_access_token';
 
 const PREGNANCY_MIN_AGE = 12;
 const PREGNANCY_MAX_AGE = 55;
 
-const initialProfile = {
-    fullName: 'Aarav Sharma',
-    email: 'aarav.sharma@example.com',
-    phone: '+91 98765 43210',
+const emptyProfile = {
+    dob: '',
+    gender: '',
+    bloodGroup: '',
 
-    dob: '2002-06-15',
-    gender: 'male',
-    bloodGroup: 'O+',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
 
-    allergies: 'No known allergies',
-    chronicConditions: 'None reported',
-    medications: 'None reported',
-    majorIllnesses: 'None reported',
-    disabilities: 'None reported',
+    allergies: '',
+    chronicConditions: '',
+    medications: '',
+    majorIllnesses: '',
+    disabilities: '',
     pregnancyStatus: '',
 
-    height: '172',
-    weight: '68',
+    height: '',
+    weight: '',
+
+    emergencyContactName: '',
+    emergencyContactRelation: '',
+    emergencyContactNumber: '',
 };
 
 function calculateAge(dateOfBirth) {
@@ -52,14 +63,20 @@ function calculateAge(dateOfBirth) {
 
     const today = new Date();
 
-    let age = today.getFullYear() - birthDate.getFullYear();
+    let age =
+        today.getFullYear() -
+        birthDate.getFullYear();
 
-    const monthDifference = today.getMonth() - birthDate.getMonth();
+    const monthDifference =
+        today.getMonth() -
+        birthDate.getMonth();
 
     if (
         monthDifference < 0 ||
-        (monthDifference === 0 &&
-            today.getDate() < birthDate.getDate())
+        (
+            monthDifference === 0 &&
+            today.getDate() < birthDate.getDate()
+        )
     ) {
         age -= 1;
     }
@@ -67,25 +84,304 @@ function calculateAge(dateOfBirth) {
     return age;
 }
 
-function FieldLabel({ children, required = false }) {
+function FieldLabel({
+    children,
+    required = false,
+}) {
     return (
         <label className="sj-label">
             {children}
+
             {required && (
-                <span className="ml-1 text-red-500">*</span>
+                <span className="ml-1 text-red-500">
+                    *
+                </span>
             )}
         </label>
     );
 }
 
-function MedicalProfile() {
-    const [formData, setFormData] = React.useState(initialProfile);
-    const [savedData, setSavedData] = React.useState(initialProfile);
-    const [isEditing, setIsEditing] = React.useState(false);
-    const [isSaving, setIsSaving] = React.useState(false);
-    const [saveMessage, setSaveMessage] = React.useState('');
+function getErrorMessage(error) {
+    const detail = error?.data?.detail;
 
-    const patientAge = calculateAge(formData.dob);
+    /*
+     * FastAPI validation errors normally look like:
+     *
+     * {
+     *   detail: [
+     *     {
+     *       type: "...",
+     *       loc: ["body", "city"],
+     *       msg: "Field required"
+     *     }
+     *   ]
+     * }
+     */
+
+    if (Array.isArray(detail)) {
+        return detail
+            .map((item) => {
+                if (typeof item === 'string') {
+                    return item;
+                }
+
+                if (
+                    item?.msg &&
+                    Array.isArray(item?.loc)
+                ) {
+                    const location =
+                        item.loc
+                            .filter(
+                                (part) =>
+                                    part !== 'body' &&
+                                    part !== 'query' &&
+                                    part !== 'path',
+                            )
+                            .join('.');
+
+                    return location
+                        ? `${location}: ${item.msg}`
+                        : item.msg;
+                }
+
+                return (
+                    item?.msg ||
+                    item?.message ||
+                    'Invalid information.'
+                );
+            })
+            .join(' ');
+    }
+
+    if (typeof detail === 'string') {
+        return detail;
+    }
+
+    if (
+        detail &&
+        typeof detail === 'object'
+    ) {
+        return (
+            detail?.msg ||
+            detail?.message ||
+            'Invalid information.'
+        );
+    }
+
+    if (
+        typeof error?.data?.message ===
+        'string'
+    ) {
+        return error.data.message;
+    }
+
+    if (
+        typeof error?.message === 'string'
+    ) {
+        return error.message;
+    }
+
+    return 'Something went wrong. Please try again.';
+}
+
+function formatDate(dateValue) {
+    if (!dateValue) {
+        return 'Not provided';
+    }
+
+    const date = new Date(
+        `${dateValue}T00:00:00`,
+    );
+
+    if (Number.isNaN(date.getTime())) {
+        return dateValue;
+    }
+
+    return new Intl.DateTimeFormat(
+        'en-IN',
+        {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        },
+    ).format(date);
+}
+
+function formatGender(gender) {
+    if (!gender) {
+        return 'Prefer not to say';
+    }
+
+    const labels = {
+        female: 'Female',
+        male: 'Male',
+        non_binary: 'Non-binary',
+        other: 'Other',
+    };
+
+    return (
+        labels[gender] ||
+        gender
+            .replaceAll('_', ' ')
+            .replace(
+                /\b\w/g,
+                (character) =>
+                    character.toUpperCase(),
+            )
+    );
+}
+
+function formatPregnancyStatus(status) {
+    if (status === 'pregnant') {
+        return 'Pregnant';
+    }
+
+    if (status === 'not_pregnant') {
+        return 'Not pregnant';
+    }
+
+    return 'Prefer not to say';
+}
+
+function displayValue(value) {
+    if (
+        value === null ||
+        value === undefined ||
+        String(value).trim() === ''
+    ) {
+        return 'Not provided';
+    }
+
+    return String(value);
+}
+
+function mapProfileToForm(profile) {
+    const emergencyContact =
+        profile?.emergency_contacts?.find(
+            (contact) =>
+                contact.is_primary,
+        ) ||
+        profile?.emergency_contacts?.[0] ||
+        null;
+
+    const medicalProfile =
+        profile?.medical_profile || {};
+
+    return {
+        dob:
+            profile?.date_of_birth || '',
+
+        gender:
+            profile?.gender || '',
+
+        bloodGroup:
+            profile?.blood_group || '',
+
+        /*
+         * These fields are not edited on this page,
+         * but MUST be preserved because the backend
+         * requires them during PUT /patient/profile.
+         */
+        address:
+            profile?.address || '',
+
+        city:
+            profile?.city || '',
+
+        state:
+            profile?.state || '',
+
+        pincode:
+            profile?.pincode || '',
+
+        allergies:
+            medicalProfile?.allergies || '',
+
+        chronicConditions:
+            medicalProfile?.chronic_conditions ||
+            '',
+
+        medications:
+            medicalProfile?.current_medications ||
+            '',
+
+        majorIllnesses:
+            medicalProfile?.major_surgeries ||
+            '',
+
+        disabilities:
+            medicalProfile?.disabilities ||
+            '',
+
+        pregnancyStatus:
+            profile?.pregnancy_status || '',
+
+        height:
+            profile?.height_cm !== null &&
+            profile?.height_cm !== undefined
+                ? String(profile.height_cm)
+                : '',
+
+        weight:
+            profile?.weight_kg !== null &&
+            profile?.weight_kg !== undefined
+                ? String(profile.weight_kg)
+                : '',
+
+        emergencyContactName:
+            emergencyContact?.name || '',
+
+        emergencyContactRelation:
+            emergencyContact?.relationship ||
+            '',
+
+        emergencyContactNumber:
+            emergencyContact?.mobile_number ||
+            '',
+    };
+}
+
+function MedicalProfile() {
+    const {
+        user,
+        isAuthenticated,
+        isLoading: authLoading,
+    } = useAuth();
+
+    const [formData, setFormData] =
+        React.useState(emptyProfile);
+
+    const [savedData, setSavedData] =
+        React.useState(emptyProfile);
+
+    /*
+     * Keep the complete backend profile so
+     * fields that aren't editable on this page
+     * can still be preserved during PUT.
+     */
+    const [savedProfile, setSavedProfile] =
+        React.useState(null);
+
+    const [isEditing, setIsEditing] =
+        React.useState(false);
+
+    const [isLoading, setIsLoading] =
+        React.useState(true);
+
+    const [isSaving, setIsSaving] =
+        React.useState(false);
+
+    const [loadError, setLoadError] =
+        React.useState('');
+
+    const [saveMessage, setSaveMessage] =
+        React.useState('');
+
+    const [saveError, setSaveError] =
+        React.useState('');
+
+    const patientAge =
+        calculateAge(formData.dob);
 
     const shouldAskPregnancyStatus =
         formData.gender === 'female' &&
@@ -93,17 +389,164 @@ function MedicalProfile() {
         patientAge >= PREGNANCY_MIN_AGE &&
         patientAge <= PREGNANCY_MAX_AGE;
 
+    /*
+     * =============================================================
+     * GET ACCESS TOKEN
+     * =============================================================
+     */
+    const getAccessToken = React.useCallback(
+        () => {
+            return localStorage.getItem(
+                ACCESS_TOKEN_KEY,
+            );
+        },
+        [],
+    );
+
+    /*
+     * =============================================================
+     * LOAD PROFILE
+     * =============================================================
+     */
     React.useEffect(() => {
-        if (!shouldAskPregnancyStatus && formData.pregnancyStatus) {
+        let isMounted = true;
+
+        /*
+         * Do not call the backend while AuthContext
+         * is still restoring/verifying the session.
+         */
+        if (authLoading) {
+            return () => {
+                isMounted = false;
+            };
+        }
+
+        const loadProfile = async () => {
+            if (!isAuthenticated || !user) {
+                if (!isMounted) {
+                    return;
+                }
+
+                setLoadError(
+                    'Authentication required. Please log in again.',
+                );
+
+                setIsLoading(false);
+
+                return;
+            }
+
+            const accessToken =
+                getAccessToken();
+
+            if (!accessToken) {
+                if (!isMounted) {
+                    return;
+                }
+
+                setLoadError(
+                    'Your login session could not be found. Please log in again.',
+                );
+
+                setIsLoading(false);
+
+                return;
+            }
+
+            setIsLoading(true);
+            setLoadError('');
+
+            try {
+                const profile =
+                    await getPatientProfile(
+                        accessToken,
+                    );
+
+                if (!isMounted) {
+                    return;
+                }
+
+                setSavedProfile(profile);
+
+                const mappedProfile =
+                    mapProfileToForm(profile);
+
+                setFormData(mappedProfile);
+                setSavedData(mappedProfile);
+            } catch (error) {
+                if (!isMounted) {
+                    return;
+                }
+
+                console.error(
+                    'Failed to load patient profile:',
+                    error,
+                );
+
+                if (error?.status === 401) {
+                    setLoadError(
+                        'Your session has expired. Please log in again.',
+                    );
+                } else if (
+                    error?.status === 404
+                ) {
+                    setLoadError(
+                        'Your patient profile has not been completed yet.',
+                    );
+                } else {
+                    setLoadError(
+                        getErrorMessage(error),
+                    );
+                }
+            } finally {
+                if (isMounted) {
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        loadProfile();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [
+        authLoading,
+        isAuthenticated,
+        user,
+        getAccessToken,
+    ]);
+
+    /*
+     * =============================================================
+     * PREGNANCY VISIBILITY
+     * =============================================================
+     */
+    React.useEffect(() => {
+        if (
+            !shouldAskPregnancyStatus &&
+            formData.pregnancyStatus
+        ) {
             setFormData((current) => ({
                 ...current,
                 pregnancyStatus: '',
             }));
         }
-    }, [shouldAskPregnancyStatus, formData.pregnancyStatus]);
+    }, [
+        shouldAskPregnancyStatus,
+        formData.pregnancyStatus,
+    ]);
 
+    /*
+     * =============================================================
+     * FORM CHANGE
+     * =============================================================
+     */
     const handleChange = (event) => {
-        const { name, value } = event.target;
+        const {
+            name,
+            value,
+        } = event.target;
 
         setFormData((current) => ({
             ...current,
@@ -111,45 +554,345 @@ function MedicalProfile() {
         }));
 
         setSaveMessage('');
+        setSaveError('');
     };
 
+    /*
+     * =============================================================
+     * EDIT
+     * =============================================================
+     */
     const handleEdit = () => {
         setFormData(savedData);
         setIsEditing(true);
         setSaveMessage('');
+        setSaveError('');
     };
 
+    /*
+     * =============================================================
+     * CANCEL
+     * =============================================================
+     */
     const handleCancel = () => {
         setFormData(savedData);
         setIsEditing(false);
         setSaveMessage('');
+        setSaveError('');
     };
 
-    const handleSave = () => {
-        setIsSaving(true);
-        setSaveMessage('');
-
-        window.setTimeout(() => {
-            setSavedData(formData);
-            setIsSaving(false);
-            setIsEditing(false);
-            setSaveMessage('Profile updated successfully.');
-        }, 700);
-    };
-
-    const displayValue = (value) => {
-        if (!value || !value.trim()) {
-            return 'Not provided';
+    /*
+     * =============================================================
+     * SAVE
+     * =============================================================
+     */
+    const handleSave = async () => {
+        if (isSaving) {
+            return;
         }
 
-        return value;
+        setIsSaving(true);
+        setSaveMessage('');
+        setSaveError('');
+
+        const accessToken =
+            getAccessToken();
+
+        if (!accessToken) {
+            setSaveError(
+                'Authentication required. Please log in again.',
+            );
+
+            setIsSaving(false);
+
+            return;
+        }
+
+        /*
+         * Validate required backend fields before
+         * making the PUT request.
+         */
+        if (
+            !formData.city?.trim() ||
+            !formData.state?.trim() ||
+            !formData.pincode?.trim()
+        ) {
+            setSaveError(
+                'Your profile is missing city, state, or pincode. Please complete your profile setup before saving.',
+            );
+
+            setIsSaving(false);
+
+            return;
+        }
+
+        /*
+         * Validate emergency contact because the
+         * backend requires it.
+         */
+        if (
+            !formData.emergencyContactName?.trim()
+        ) {
+            setSaveError(
+                'Emergency contact name is missing. Please complete your patient profile setup.',
+            );
+
+            setIsSaving(false);
+
+            return;
+        }
+
+        if (
+            !formData.emergencyContactRelation?.trim()
+        ) {
+            setSaveError(
+                'Emergency contact relationship is missing. Please complete your patient profile setup.',
+            );
+
+            setIsSaving(false);
+
+            return;
+        }
+
+        if (
+            !formData.emergencyContactNumber?.trim()
+        ) {
+            setSaveError(
+                'Emergency contact mobile number is missing. Please complete your patient profile setup.',
+            );
+
+            setIsSaving(false);
+
+            return;
+        }
+
+        try {
+            /*
+             * Preserve fields that this page does not
+             * directly edit.
+             */
+            const payload = {
+                date_of_birth:
+                    formData.dob,
+
+                gender:
+                    formData.gender || null,
+
+                blood_group:
+                    formData.bloodGroup || null,
+
+                /*
+                 * Required by PatientProfileCreate.
+                 * These values came from the existing
+                 * patient profile.
+                 */
+                address:
+                    formData.address?.trim() ||
+                    null,
+
+                city:
+                    formData.city.trim(),
+
+                state:
+                    formData.state.trim(),
+
+                pincode:
+                    formData.pincode.trim(),
+
+                height_cm:
+                    formData.height
+                        ? Number(formData.height)
+                        : null,
+
+                weight_kg:
+                    formData.weight
+                        ? Number(formData.weight)
+                        : null,
+
+                pregnancy_status:
+                    shouldAskPregnancyStatus
+                        ? formData.pregnancyStatus ||
+                          null
+                        : null,
+
+                /*
+                 * Preserve actual consent values from
+                 * the backend instead of forcing them.
+                 */
+                medical_sharing_accepted:
+                    Boolean(
+                        savedProfile?.medical_sharing_accepted,
+                    ),
+
+                terms_accepted:
+                    Boolean(
+                        savedProfile?.terms_accepted,
+                    ),
+
+                /*
+                 * Preserve the actual primary
+                 * emergency contact.
+                 */
+                emergency_contact: {
+                    name:
+                        formData.emergencyContactName.trim(),
+
+                    relationship:
+                        formData.emergencyContactRelation.trim(),
+
+                    mobile_number:
+                        formData.emergencyContactNumber.trim(),
+
+                    is_primary: true,
+                },
+
+                medical_profile: {
+                    allergies:
+                        formData.allergies.trim() ||
+                        null,
+
+                    chronic_conditions:
+                        formData.chronicConditions.trim() ||
+                        null,
+
+                    current_medications:
+                        formData.medications.trim() ||
+                        null,
+
+                    major_surgeries:
+                        formData.majorIllnesses.trim() ||
+                        null,
+
+                    disabilities:
+                        formData.disabilities.trim() ||
+                        null,
+                },
+            };
+
+            console.log(
+                'Updating patient profile with payload:',
+                payload,
+            );
+
+            const updatedProfile =
+                await updatePatientProfile(
+                    payload,
+                    accessToken,
+                );
+
+            /*
+             * Store the complete updated backend
+             * response.
+             */
+            setSavedProfile(
+                updatedProfile,
+            );
+
+            const updatedForm =
+                mapProfileToForm(
+                    updatedProfile,
+                );
+
+            setFormData(updatedForm);
+            setSavedData(updatedForm);
+            setIsEditing(false);
+
+            setSaveMessage(
+                'Medical profile updated successfully.',
+            );
+        } catch (error) {
+            console.error(
+                'Failed to update patient medical profile:',
+                error,
+            );
+
+            if (error?.status === 401) {
+                setSaveError(
+                    'Your session has expired. Please log in again.',
+                );
+            } else if (
+                error?.status === 422
+            ) {
+                setSaveError(
+                    `Please check your profile information. ${getErrorMessage(error)}`,
+                );
+            } else {
+                setSaveError(
+                    getErrorMessage(error),
+                );
+            }
+        } finally {
+            setIsSaving(false);
+        }
     };
+
+    /*
+     * =============================================================
+     * AUTH LOADING
+     * =============================================================
+     */
+    if (authLoading) {
+        return (
+            <div className="sanjeevani-page min-h-screen">
+                <PatientNavbar />
+
+                <main className="mx-auto flex min-h-[70vh] max-w-5xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+                    <div className="text-center">
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-(--sj-primary)/10">
+                            <span className="h-6 w-6 animate-spin rounded-full border-2 border-(--sj-primary)/20 border-t-(--sj-primary)" />
+                        </div>
+
+                        <h2 className="mt-5 text-lg font-black text-(--sj-text)">
+                            Verifying your session
+                        </h2>
+
+                        <p className="mt-2 text-sm text-(--sj-text-soft)">
+                            Please wait while we restore your
+                            secure session...
+                        </p>
+                    </div>
+                </main>
+            </div>
+        );
+    }
+
+    /*
+     * =============================================================
+     * PROFILE LOADING
+     * =============================================================
+     */
+    if (isLoading) {
+        return (
+            <div className="sanjeevani-page min-h-screen">
+                <PatientNavbar />
+
+                <main className="mx-auto flex min-h-[70vh] max-w-5xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+                    <div className="text-center">
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-(--sj-primary)/10">
+                            <span className="h-6 w-6 animate-spin rounded-full border-2 border-(--sj-primary)/20 border-t-(--sj-primary)" />
+                        </div>
+
+                        <h2 className="mt-5 text-lg font-black text-(--sj-text)">
+                            Loading your medical profile
+                        </h2>
+
+                        <p className="mt-2 text-sm text-(--sj-text-soft)">
+                            Fetching your latest saved information...
+                        </p>
+                    </div>
+                </main>
+            </div>
+        );
+    }
 
     return (
         <div className="sanjeevani-page min-h-screen">
             <PatientNavbar />
 
             <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+                {/* =====================================================
+                    HEADER
+                ===================================================== */}
                 <section className="mb-8">
                     <p className="text-xs font-black uppercase tracking-[0.18em] text-(--sj-primary)">
                         Patient profile
@@ -162,34 +905,50 @@ function MedicalProfile() {
                             </h1>
 
                             <p className="mt-3 max-w-2xl text-sm leading-6 text-(--sj-text-soft) sm:text-base">
-                                Keep your personal, contact, and medical
-                                information updated so emergency teams can
-                                access relevant information when needed.
+                                Keep your personal, contact, and
+                                medical information updated so
+                                emergency teams can access relevant
+                                information when needed.
                             </p>
                         </div>
 
-                        {!isEditing && (
-                            <button
-                                type="button"
-                                onClick={handleEdit}
-                                className="sj-ai-button w-full px-5 py-3 text-sm sm:w-auto"
-                            >
-                                <Edit3 className="h-4 w-4" />
-                                Edit profile
-                            </button>
-                        )}
+                        {!isEditing &&
+                            !loadError && (
+                                <button
+                                    type="button"
+                                    onClick={handleEdit}
+                                    className="sj-ai-button w-full px-5 py-3 text-sm sm:w-auto"
+                                >
+                                    <Edit3 className="h-4 w-4" />
+                                    Edit profile
+                                </button>
+                            )}
                     </div>
 
+                    {loadError && (
+                        <div className="mt-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-400">
+                            {loadError}
+                        </div>
+                    )}
+
                     {saveMessage && (
-                        <div className="mt-5 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-600">
+                        <div className="mt-5 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                             <Check className="h-4 w-4" />
                             {saveMessage}
+                        </div>
+                    )}
+
+                    {saveError && (
+                        <div className="mt-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-400">
+                            {saveError}
                         </div>
                     )}
                 </section>
 
                 <div className="space-y-6">
-                    {/* Account information */}
+                    {/* =================================================
+                        ACCOUNT INFORMATION
+                    ================================================= */}
                     <section className="sj-card overflow-hidden">
                         <div className="border-b border-(--sj-border) px-5 py-5 sm:px-6">
                             <div className="flex items-start gap-3">
@@ -216,23 +975,20 @@ function MedicalProfile() {
                                     Full name
                                 </FieldLabel>
 
-                                {isEditing ? (
-                                    <input
-                                        type="text"
-                                        name="fullName"
-                                        value={formData.fullName}
-                                        onChange={handleChange}
-                                        className="sj-input px-4 py-3 text-sm"
-                                        placeholder="Enter your full name"
-                                    />
-                                ) : (
-                                    <div className="flex items-center gap-3 rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3">
-                                        <UserRound className="h-4 w-4 shrink-0 text-(--sj-text-muted)" />
-                                        <span className="text-sm font-semibold text-(--sj-text)">
-                                            {displayValue(savedData.fullName)}
-                                        </span>
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-3 rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3">
+                                    <UserRound className="h-4 w-4 shrink-0 text-(--sj-text-muted)" />
+
+                                    <span className="truncate text-sm font-semibold text-(--sj-text)">
+                                        {displayValue(
+                                            user?.full_name,
+                                        )}
+                                    </span>
+                                </div>
+
+                                <p className="mt-2 text-xs leading-5 text-(--sj-text-muted)">
+                                    Your name is managed through your
+                                    Sanjeevani AI account.
+                                </p>
                             </div>
 
                             <div>
@@ -240,31 +996,20 @@ function MedicalProfile() {
                                     Email address
                                 </FieldLabel>
 
-                                {isEditing ? (
-                                    <input
-                                        type="email"
-                                        name="email"
-                                        value={formData.email}
-                                        onChange={handleChange}
-                                        className="sj-input px-4 py-3 text-sm"
-                                        placeholder="Enter your email"
-                                    />
-                                ) : (
-                                    <div className="flex items-center gap-3 rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3">
-                                        <Mail className="h-4 w-4 shrink-0 text-(--sj-text-muted)" />
-                                        <span className="truncate text-sm font-semibold text-(--sj-text)">
-                                            {displayValue(savedData.email)}
-                                        </span>
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-3 rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3">
+                                    <Mail className="h-4 w-4 shrink-0 text-(--sj-text-muted)" />
 
-                                {isEditing && (
-                                    <p className="mt-2 text-xs leading-5 text-(--sj-text-muted)">
-                                        Changing your email will require
-                                        verification with OTP after backend
-                                        integration.
-                                    </p>
-                                )}
+                                    <span className="truncate text-sm font-semibold text-(--sj-text)">
+                                        {displayValue(
+                                            user?.email,
+                                        )}
+                                    </span>
+                                </div>
+
+                                <p className="mt-2 text-xs leading-5 text-(--sj-text-muted)">
+                                    Email changes require account-level
+                                    verification.
+                                </p>
                             </div>
 
                             <div>
@@ -272,31 +1017,20 @@ function MedicalProfile() {
                                     Phone number
                                 </FieldLabel>
 
-                                {isEditing ? (
-                                    <input
-                                        type="tel"
-                                        name="phone"
-                                        value={formData.phone}
-                                        onChange={handleChange}
-                                        className="sj-input px-4 py-3 text-sm"
-                                        placeholder="Enter your phone number"
-                                    />
-                                ) : (
-                                    <div className="flex items-center gap-3 rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3">
-                                        <Phone className="h-4 w-4 shrink-0 text-(--sj-text-muted)" />
-                                        <span className="text-sm font-semibold text-(--sj-text)">
-                                            {displayValue(savedData.phone)}
-                                        </span>
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-3 rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3">
+                                    <Phone className="h-4 w-4 shrink-0 text-(--sj-text-muted)" />
 
-                                {isEditing && (
-                                    <p className="mt-2 text-xs leading-5 text-(--sj-text-muted)">
-                                        Changing your phone number will require
-                                        SMS OTP verification after backend
-                                        integration.
-                                    </p>
-                                )}
+                                    <span className="text-sm font-semibold text-(--sj-text)">
+                                        {displayValue(
+                                            user?.mobile_number,
+                                        )}
+                                    </span>
+                                </div>
+
+                                <p className="mt-2 text-xs leading-5 text-(--sj-text-muted)">
+                                    Phone changes require SMS OTP
+                                    verification.
+                                </p>
                             </div>
 
                             <div>
@@ -309,12 +1043,14 @@ function MedicalProfile() {
 
                                     <div>
                                         <p className="text-sm font-bold text-(--sj-text)">
-                                            Verified account
+                                            {user?.is_verified
+                                                ? 'Verified account'
+                                                : 'Account verification pending'}
                                         </p>
 
                                         <p className="text-xs text-(--sj-text-soft)">
-                                            Email and phone verification
-                                            managed by Sanjeevani AI.
+                                            Authentication is managed by
+                                            Sanjeevani AI.
                                         </p>
                                     </div>
                                 </div>
@@ -322,7 +1058,9 @@ function MedicalProfile() {
                         </div>
                     </section>
 
-                    {/* Personal information */}
+                    {/* =================================================
+                        PERSONAL INFORMATION
+                    ================================================= */}
                     <section className="sj-card overflow-hidden">
                         <div className="border-b border-(--sj-border) px-5 py-5 sm:px-6">
                             <div className="flex items-start gap-3">
@@ -354,13 +1092,19 @@ function MedicalProfile() {
                                     <input
                                         type="date"
                                         name="dob"
-                                        value={formData.dob}
-                                        onChange={handleChange}
+                                        value={
+                                            formData.dob
+                                        }
+                                        onChange={
+                                            handleChange
+                                        }
                                         className="sj-input px-4 py-3 text-sm"
                                     />
                                 ) : (
                                     <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3 text-sm font-semibold text-(--sj-text)">
-                                        {savedData.dob || 'Not provided'}
+                                        {formatDate(
+                                            savedData.dob,
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -373,32 +1117,39 @@ function MedicalProfile() {
                                 {isEditing ? (
                                     <select
                                         name="gender"
-                                        value={formData.gender}
-                                        onChange={handleChange}
+                                        value={
+                                            formData.gender
+                                        }
+                                        onChange={
+                                            handleChange
+                                        }
                                         className="sj-input px-4 py-3 text-sm"
                                     >
                                         <option value="">
                                             Prefer not to say
                                         </option>
+
                                         <option value="female">
                                             Female
                                         </option>
+
                                         <option value="male">
                                             Male
                                         </option>
+
                                         <option value="non_binary">
                                             Non-binary
                                         </option>
+
                                         <option value="other">
                                             Other
                                         </option>
                                     </select>
                                 ) : (
-                                    <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3 text-sm font-semibold capitalize text-(--sj-text)">
-                                        {savedData.gender === 'non_binary'
-                                            ? 'Non-binary'
-                                            : savedData.gender ||
-                                              'Prefer not to say'}
+                                    <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3 text-sm font-semibold text-(--sj-text)">
+                                        {formatGender(
+                                            savedData.gender,
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -411,32 +1162,63 @@ function MedicalProfile() {
                                 {isEditing ? (
                                     <select
                                         name="bloodGroup"
-                                        value={formData.bloodGroup}
-                                        onChange={handleChange}
+                                        value={
+                                            formData.bloodGroup
+                                        }
+                                        onChange={
+                                            handleChange
+                                        }
                                         className="sj-input px-4 py-3 text-sm"
                                     >
                                         <option value="">
                                             Not known
                                         </option>
-                                        <option value="A+">A+</option>
-                                        <option value="A-">A-</option>
-                                        <option value="B+">B+</option>
-                                        <option value="B-">B-</option>
-                                        <option value="AB+">AB+</option>
-                                        <option value="AB-">AB-</option>
-                                        <option value="O+">O+</option>
-                                        <option value="O-">O-</option>
+
+                                        <option value="A+">
+                                            A+
+                                        </option>
+
+                                        <option value="A-">
+                                            A-
+                                        </option>
+
+                                        <option value="B+">
+                                            B+
+                                        </option>
+
+                                        <option value="B-">
+                                            B-
+                                        </option>
+
+                                        <option value="AB+">
+                                            AB+
+                                        </option>
+
+                                        <option value="AB-">
+                                            AB-
+                                        </option>
+
+                                        <option value="O+">
+                                            O+
+                                        </option>
+
+                                        <option value="O-">
+                                            O-
+                                        </option>
                                     </select>
                                 ) : (
                                     <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3 text-sm font-semibold text-(--sj-text)">
-                                        {savedData.bloodGroup || 'Not known'}
+                                        {savedData.bloodGroup ||
+                                            'Not known'}
                                     </div>
                                 )}
                             </div>
                         </div>
                     </section>
 
-                    {/* Medical information */}
+                    {/* =================================================
+                        MEDICAL INFORMATION
+                    ================================================= */}
                     <section className="sj-card overflow-hidden">
                         <div className="border-b border-(--sj-border) px-5 py-5 sm:px-6">
                             <div className="flex items-start gap-3">
@@ -467,15 +1249,21 @@ function MedicalProfile() {
                                 {isEditing ? (
                                     <textarea
                                         name="allergies"
-                                        value={formData.allergies}
-                                        onChange={handleChange}
+                                        value={
+                                            formData.allergies
+                                        }
+                                        onChange={
+                                            handleChange
+                                        }
                                         rows="3"
                                         className="sj-input resize-none px-4 py-3 text-sm"
                                         placeholder="List known allergies"
                                     />
                                 ) : (
                                     <div className="min-h-20 rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3 text-sm leading-6 text-(--sj-text)">
-                                        {displayValue(savedData.allergies)}
+                                        {displayValue(
+                                            savedData.allergies,
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -488,8 +1276,12 @@ function MedicalProfile() {
                                 {isEditing ? (
                                     <textarea
                                         name="chronicConditions"
-                                        value={formData.chronicConditions}
-                                        onChange={handleChange}
+                                        value={
+                                            formData.chronicConditions
+                                        }
+                                        onChange={
+                                            handleChange
+                                        }
                                         rows="3"
                                         className="sj-input resize-none px-4 py-3 text-sm"
                                         placeholder="List chronic conditions"
@@ -511,15 +1303,21 @@ function MedicalProfile() {
                                 {isEditing ? (
                                     <textarea
                                         name="medications"
-                                        value={formData.medications}
-                                        onChange={handleChange}
+                                        value={
+                                            formData.medications
+                                        }
+                                        onChange={
+                                            handleChange
+                                        }
                                         rows="3"
                                         className="sj-input resize-none px-4 py-3 text-sm"
                                         placeholder="List current medications"
                                     />
                                 ) : (
                                     <div className="min-h-20 rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3 text-sm leading-6 text-(--sj-text)">
-                                        {displayValue(savedData.medications)}
+                                        {displayValue(
+                                            savedData.medications,
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -532,8 +1330,12 @@ function MedicalProfile() {
                                 {isEditing ? (
                                     <textarea
                                         name="majorIllnesses"
-                                        value={formData.majorIllnesses}
-                                        onChange={handleChange}
+                                        value={
+                                            formData.majorIllnesses
+                                        }
+                                        onChange={
+                                            handleChange
+                                        }
                                         rows="3"
                                         className="sj-input resize-none px-4 py-3 text-sm"
                                         placeholder="List major surgeries or serious illnesses"
@@ -556,8 +1358,12 @@ function MedicalProfile() {
                                 {isEditing ? (
                                     <textarea
                                         name="disabilities"
-                                        value={formData.disabilities}
-                                        onChange={handleChange}
+                                        value={
+                                            formData.disabilities
+                                        }
+                                        onChange={
+                                            handleChange
+                                        }
                                         rows="3"
                                         className="sj-input resize-none px-4 py-3 text-sm"
                                         placeholder="Add any disability or important medical condition emergency teams should know"
@@ -584,15 +1390,19 @@ function MedicalProfile() {
                                                 value={
                                                     formData.pregnancyStatus
                                                 }
-                                                onChange={handleChange}
+                                                onChange={
+                                                    handleChange
+                                                }
                                                 className="sj-input px-4 py-3 text-sm"
                                             >
                                                 <option value="">
                                                     Prefer not to say
                                                 </option>
+
                                                 <option value="not_pregnant">
                                                     Not pregnant
                                                 </option>
+
                                                 <option value="pregnant">
                                                     Pregnant
                                                 </option>
@@ -606,13 +1416,9 @@ function MedicalProfile() {
                                         </>
                                     ) : (
                                         <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3 text-sm font-semibold text-(--sj-text)">
-                                            {savedData.pregnancyStatus ===
-                                            'pregnant'
-                                                ? 'Pregnant'
-                                                : savedData.pregnancyStatus ===
-                                                    'not_pregnant'
-                                                  ? 'Not pregnant'
-                                                  : 'Prefer not to say'}
+                                            {formatPregnancyStatus(
+                                                savedData.pregnancyStatus,
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -620,7 +1426,9 @@ function MedicalProfile() {
                         </div>
                     </section>
 
-                    {/* Physical information */}
+                    {/* =================================================
+                        PHYSICAL INFORMATION
+                    ================================================= */}
                     <section className="sj-card overflow-hidden">
                         <div className="border-b border-(--sj-border) px-5 py-5 sm:px-6">
                             <h2 className="text-lg font-black text-(--sj-text)">
@@ -643,9 +1451,14 @@ function MedicalProfile() {
                                     <input
                                         type="number"
                                         name="height"
-                                        value={formData.height}
-                                        onChange={handleChange}
-                                        min="0"
+                                        value={
+                                            formData.height
+                                        }
+                                        onChange={
+                                            handleChange
+                                        }
+                                        min="30"
+                                        max="250"
                                         className="sj-input px-4 py-3 text-sm"
                                         placeholder="e.g. 172"
                                     />
@@ -667,9 +1480,15 @@ function MedicalProfile() {
                                     <input
                                         type="number"
                                         name="weight"
-                                        value={formData.weight}
-                                        onChange={handleChange}
-                                        min="0"
+                                        value={
+                                            formData.weight
+                                        }
+                                        onChange={
+                                            handleChange
+                                        }
+                                        min="1"
+                                        max="500"
+                                        step="0.1"
                                         className="sj-input px-4 py-3 text-sm"
                                         placeholder="e.g. 68"
                                     />
@@ -684,7 +1503,9 @@ function MedicalProfile() {
                         </div>
                     </section>
 
-                    {/* Privacy */}
+                    {/* =================================================
+                        PRIVACY
+                    ================================================= */}
                     <section className="rounded-2xl border border-(--sj-border) bg-(--sj-surface) p-5 sm:p-6">
                         <div className="flex items-start gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-(--sj-primary)/10 text-(--sj-primary)">
@@ -707,14 +1528,20 @@ function MedicalProfile() {
                         </div>
                     </section>
 
-                    {/* Save controls */}
+                    {/* =================================================
+                        SAVE CONTROLS
+                    ================================================= */}
                     {isEditing && (
                         <div className="sticky bottom-4 z-30 rounded-2xl border border-(--sj-border) bg-(--sj-surface)/95 p-3 shadow-xl backdrop-blur-xl sm:p-4">
                             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                                 <button
                                     type="button"
-                                    onClick={handleCancel}
-                                    disabled={isSaving}
+                                    onClick={
+                                        handleCancel
+                                    }
+                                    disabled={
+                                        isSaving
+                                    }
                                     className="inline-flex items-center justify-center gap-2 rounded-xl border border-(--sj-border) px-5 py-3 text-sm font-bold text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-text) disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     <X className="h-4 w-4" />
@@ -723,8 +1550,12 @@ function MedicalProfile() {
 
                                 <button
                                     type="button"
-                                    onClick={handleSave}
-                                    disabled={isSaving}
+                                    onClick={
+                                        handleSave
+                                    }
+                                    disabled={
+                                        isSaving
+                                    }
                                     className="sj-ai-button px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     {isSaving ? (

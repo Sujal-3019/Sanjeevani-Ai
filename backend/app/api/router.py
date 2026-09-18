@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from app.api.auth import router as auth_router
 from app.api.test_protected import router as test_protected_router
-
+from app.api.patient import router as patient_router
 
 router = APIRouter()
 
@@ -22,4 +22,9 @@ router.include_router(
 
 router.include_router(
     test_protected_router,
+)
+
+router.include_router(
+    patient_router,
+    prefix="/patient",
 )

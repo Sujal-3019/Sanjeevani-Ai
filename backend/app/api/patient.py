@@ -34,6 +34,7 @@ def _serialize_patient_profile(profile):
             "name": contact.name,
             "relationship": contact.contact_relationship,
             "mobile_number": contact.mobile_number,
+            "email": contact.email,
             "is_primary": contact.is_primary,
         }
         for contact in profile.emergency_contacts

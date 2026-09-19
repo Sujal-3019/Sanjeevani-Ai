@@ -1,7 +1,6 @@
 import uuid
-from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -10,6 +9,20 @@ from app.db.base import Base
 
 class EmergencyContact(Base):
     __tablename__ = "emergency_contacts"
+
+    __table_args__ = (
+        Index(
+            "uq_emergency_contacts_primary_per_patient",
+            "patient_profile_id",
+            unique=True,
+            postgresql_where=(
+                # PostgreSQL partial unique index:
+                # only rows where is_primary = TRUE participate.
+                # This guarantees at most one primary contact per patient.
+                "is_primary = true"
+            ),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -43,26 +56,31 @@ class EmergencyContact(Base):
         nullable=False,
     )
 
+    email: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
     is_primary: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
-        default=True,
+        default=False,
     )
 
-    created_at: Mapped[datetime] = mapped_column(
+    created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
     )
 
-    updated_at: Mapped[datetime] = mapped_column(
+    updated_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
     )
 
-    patient_profile: Mapped["PatientProfile"] = relationship(
+    patient_profile = relationship(
         "PatientProfile",
         back_populates="emergency_contacts",
     )

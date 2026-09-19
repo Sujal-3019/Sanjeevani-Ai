@@ -22,6 +22,13 @@ from app.schemas.patient_profile import (
     PatientProfileResponse,
 )
 
+from app.schemas.emergency_contact import (
+    EmergencyContactCreate,
+    EmergencyContactListResponse,
+    EmergencyContactResponse,
+    EmergencyContactUpdate,
+)
+
 __all__ = [
     # Authentication
     "MessageResponse",
@@ -39,7 +46,10 @@ __all__ = [
 
     # Patient profile
     "EmergencyContactData",
+    "EmergencyContactCreate",
+    "EmergencyContactListResponse",
     "EmergencyContactResponse",
+    "EmergencyContactUpdate",
     "PatientMedicalProfileData",
     "PatientMedicalProfileResponse",
     "PatientProfileCreate",

@@ -3,7 +3,9 @@ from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
+from app.schemas.emergency_contact import (
+    EmergencyContactResponse,
+)
 
 class EmergencyContactData(BaseModel):
     name: str = Field(min_length=2, max_length=150)
@@ -130,16 +132,6 @@ class PatientProfileCreate(BaseModel):
             )
 
         return value
-
-
-class EmergencyContactResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    name: str
-    relationship: str
-    mobile_number: str
-    is_primary: bool
 
 
 class PatientMedicalProfileResponse(BaseModel):

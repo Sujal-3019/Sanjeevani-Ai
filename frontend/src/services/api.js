@@ -2,10 +2,7 @@ const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
 
 
-async function request(
-    endpoint,
-    options = {},
-) {
+async function request(endpoint, options = {}) {
     const {
         method = 'GET',
         body,
@@ -37,17 +34,41 @@ async function request(
         },
     );
 
-    let data = null;
-
     const contentType =
         response.headers.get('content-type') || '';
 
-    if (contentType.includes('application/json')) {
-        data = await response.json();
-    } else {
-        const text = await response.text();
+    /*
+     * Some successful endpoints, especially DELETE endpoints,
+     * may return 204 No Content or an empty response body.
+     *
+     * Do not attempt JSON parsing when there is no content.
+     */
+    if (
+        response.status === 204 ||
+        response.status === 205
+    ) {
+        return null;
+    }
 
-        if (text) {
+    const text = await response.text();
+
+    let data = null;
+
+    if (text.trim()) {
+        if (contentType.includes('application/json')) {
+            try {
+                data = JSON.parse(text);
+            } catch (parseError) {
+                const error = new Error(
+                    'The server returned an invalid JSON response.',
+                );
+
+                error.status = response.status;
+                error.data = null;
+
+                throw error;
+            }
+        } else {
             data = {
                 detail: text,
             };

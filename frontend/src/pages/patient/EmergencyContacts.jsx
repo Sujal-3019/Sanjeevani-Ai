@@ -1,9 +1,9 @@
 import React from 'react';
 import {
     AlertCircle,
-    ArrowLeft,
     CheckCircle2,
     Edit3,
+    Loader2,
     Mail,
     Phone,
     Plus,
@@ -12,27 +12,11 @@ import {
     UserRound,
     X,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import PatientNavbar from '../../components/layout/PatientNavbar';
 
-const initialContacts = [
-    {
-        id: 1,
-        name: 'Priya Sharma',
-        relationship: 'Mother',
-        phone: '+91 98765 43210',
-        email: 'priya@example.com',
-        primary: true,
-    },
-    {
-        id: 2,
-        name: 'Arjun Sharma',
-        relationship: 'Brother',
-        phone: '+91 98765 12345',
-        email: 'arjun@example.com',
-        primary: false,
-    },
-];
+import authService from '../../services/authService';
+import PatientNavbar from '../../components/layout/PatientNavbar';
+import { useAuth } from '../../context/AuthContext';
+import { emergencyContactService } from '../../services/emergencyContactService.js';
 
 const emptyForm = {
     name: '',
@@ -43,98 +27,351 @@ const emptyForm = {
 };
 
 function EmergencyContacts() {
-    const [contacts, setContacts] = React.useState(initialContacts);
+    const { isLoading: isAuthLoading } = useAuth();
+
+    const [contacts, setContacts] = React.useState([]);
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [pageError, setPageError] = React.useState('');
+    const [actionError, setActionError] = React.useState('');
+    const [successMessage, setSuccessMessage] = React.useState('');
+
     const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [editingId, setEditingId] = React.useState(null);
     const [formData, setFormData] = React.useState(emptyForm);
-    const [saved, setSaved] = React.useState(false);
+    const [isSaving, setIsSaving] = React.useState(false);
+
+    const [deletingId, setDeletingId] = React.useState(null);
+    const [primaryId, setPrimaryId] = React.useState(null);
+
+    const loadContacts = React.useCallback(async () => {
+        const accessToken = authService.getAccessToken();
+
+        if (!accessToken) {
+            setIsLoading(false);
+            setPageError(
+                'Your session could not be verified. Please sign in again.',
+            );
+            return;
+        }
+
+        setIsLoading(true);
+        setPageError('');
+
+        try {
+            const response =
+                await emergencyContactService.getContacts(
+                    accessToken,
+                );
+
+            const nextContacts = Array.isArray(response)
+                ? response
+                : response?.contacts || [];
+
+            setContacts(nextContacts);
+        } catch (error) {
+            setPageError(
+                getApiErrorMessage(
+                    error,
+                    'Unable to load emergency contacts.',
+                ),
+            );
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    React.useEffect(() => {
+        if (isAuthLoading) {
+            return;
+        }
+
+        loadContacts();
+    }, [
+        isAuthLoading,
+        loadContacts,
+    ]);
+
+    React.useEffect(() => {
+        if (!successMessage) {
+            return undefined;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            setSuccessMessage('');
+        }, 4000);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, [successMessage]);
 
     function openAddModal() {
         setEditingId(null);
-        setFormData(emptyForm);
-        setSaved(false);
+
+        setFormData({
+            ...emptyForm,
+            primary: contacts.length === 0,
+        });
+
+        setActionError('');
         setIsModalOpen(true);
     }
 
     function openEditModal(contact) {
         setEditingId(contact.id);
+
         setFormData({
-            name: contact.name,
-            relationship: contact.relationship,
-            phone: contact.phone,
-            email: contact.email,
-            primary: contact.primary,
+            name: contact.name || '',
+            relationship: contact.relationship || '',
+            phone: contact.mobile_number || '',
+            email: contact.email || '',
+            primary: Boolean(contact.is_primary),
         });
-        setSaved(false);
+
+        setActionError('');
         setIsModalOpen(true);
     }
 
     function closeModal() {
+        if (isSaving) {
+            return;
+        }
+
         setIsModalOpen(false);
         setEditingId(null);
         setFormData(emptyForm);
+        setActionError('');
     }
 
     function handleChange(event) {
-        const { name, value, type, checked } = event.target;
+        const {
+            name,
+            value,
+            type,
+            checked,
+        } = event.target;
 
         setFormData((current) => ({
             ...current,
-            [name]: type === 'checkbox' ? checked : value,
+            [name]: type === 'checkbox'
+                ? checked
+                : value,
         }));
 
-        setSaved(false);
+        setActionError('');
     }
 
-    function handleSave(event) {
+    async function handleSave(event) {
         event.preventDefault();
 
-        const contact = {
-            id: editingId ?? Date.now(),
-            ...formData,
+        if (isSaving) {
+            return;
+        }
+
+        const accessToken = authService.getAccessToken();
+
+        if (!accessToken) {
+            setActionError(
+                'Your session has expired. Please sign in again.',
+            );
+            return;
+        }
+
+        setIsSaving(true);
+        setActionError('');
+        setSuccessMessage('');
+
+        const payload = {
+            name: formData.name.trim(),
+            relationship: formData.relationship.trim(),
+            mobile_number: normalizePhone(
+                formData.phone,
+            ),
+            email: formData.email.trim()
+                ? formData.email.trim()
+                : null,
+            is_primary: formData.primary,
         };
 
-        setContacts((current) => {
-            let updatedContacts;
-
+        try {
             if (editingId) {
-                updatedContacts = current.map((item) =>
-                    item.id === editingId ? contact : item,
+                await emergencyContactService.updateContact(
+                    editingId,
+                    payload,
+                    accessToken,
+                );
+
+                setSuccessMessage(
+                    'Emergency contact updated successfully.',
                 );
             } else {
-                updatedContacts = [...current, contact];
+                await emergencyContactService.createContact(
+                    payload,
+                    accessToken,
+                );
+
+                setSuccessMessage(
+                    'Emergency contact added successfully.',
+                );
             }
 
-            if (contact.primary) {
-                updatedContacts = updatedContacts.map((item) => ({
-                    ...item,
-                    primary: item.id === contact.id,
-                }));
-            }
+            await loadContacts();
 
-            return updatedContacts;
-        });
-
-        closeModal();
-        setSaved(true);
+            setIsModalOpen(false);
+            setEditingId(null);
+            setFormData(emptyForm);
+        } catch (error) {
+            setActionError(
+                getApiErrorMessage(
+                    error,
+                    editingId
+                        ? 'Unable to update this emergency contact.'
+                        : 'Unable to add this emergency contact.',
+                ),
+            );
+        } finally {
+            setIsSaving(false);
+        }
     }
 
-    function handleDelete(id) {
-        setContacts((current) =>
-            current.filter((contact) => contact.id !== id),
+    async function handleDelete(contact) {
+        if (deletingId) {
+            return;
+        }
+
+        const accessToken = authService.getAccessToken();
+
+        if (!accessToken) {
+            setActionError(
+                'Your session has expired. Please sign in again.',
+            );
+            return;
+        }
+
+        const confirmed = window.confirm(
+            contact.is_primary
+                ? `Delete ${contact.name} as an emergency contact?\n\nIf other contacts remain, the oldest remaining contact will automatically become primary.`
+                : `Delete ${contact.name} as an emergency contact?`,
         );
-        setSaved(true);
+
+        if (!confirmed) {
+            return;
+        }
+
+        setDeletingId(contact.id);
+        setActionError('');
+        setSuccessMessage('');
+
+        try {
+            await emergencyContactService.deleteContact(
+                contact.id,
+                accessToken,
+            );
+
+            setContacts((currentContacts) => {
+                const remainingContacts = currentContacts.filter(
+                    (item) => item.id !== contact.id,
+                );
+
+                if (
+                    contact.is_primary &&
+                    remainingContacts.length > 0
+                ) {
+                    const oldestContact =
+                        remainingContacts.reduce(
+                            (oldest, current) => {
+                                if (!oldest) {
+                                    return current;
+                                }
+
+                                if (
+                                    current.created_at &&
+                                    oldest.created_at
+                                ) {
+                                    return new Date(
+                                        current.created_at,
+                                    ) <
+                                        new Date(
+                                            oldest.created_at,
+                                        )
+                                        ? current
+                                        : oldest;
+                                }
+
+                                return oldest;
+                            },
+                            null,
+                        );
+
+                    return remainingContacts.map((item) => ({
+                        ...item,
+                        is_primary:
+                            item.id === oldestContact?.id,
+                    }));
+                }
+
+                return remainingContacts;
+            });
+
+            setSuccessMessage(
+                contact.is_primary
+                    ? 'Emergency contact deleted. Another contact has been made primary when available.'
+                    : 'Emergency contact deleted successfully.',
+            );
+        } catch (error) {
+            setActionError(
+                getApiErrorMessage(
+                    error,
+                    'Unable to delete this emergency contact.',
+                ),
+            );
+        } finally {
+            setDeletingId(null);
+        }
     }
 
-    function makePrimary(id) {
-        setContacts((current) =>
-            current.map((contact) => ({
-                ...contact,
-                primary: contact.id === id,
-            })),
-        );
+    async function makePrimary(contact) {
+        if (
+            primaryId ||
+            contact.is_primary
+        ) {
+            return;
+        }
 
-        setSaved(true);
+        const accessToken = authService.getAccessToken();
+
+        if (!accessToken) {
+            setActionError(
+                'Your session has expired. Please sign in again.',
+            );
+            return;
+        }
+
+        setPrimaryId(contact.id);
+        setActionError('');
+        setSuccessMessage('');
+
+        try {
+            await emergencyContactService.makePrimary(
+                contact.id,
+                accessToken,
+            );
+
+            await loadContacts();
+
+            setSuccessMessage(
+                `${contact.name} is now your primary emergency contact.`,
+            );
+        } catch (error) {
+            setActionError(
+                getApiErrorMessage(
+                    error,
+                    'Unable to change the primary emergency contact.',
+                ),
+            );
+        } finally {
+            setPrimaryId(null);
+        }
     }
 
     return (
@@ -161,17 +398,54 @@ function EmergencyContacts() {
                     <button
                         type="button"
                         onClick={openAddModal}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-(--sj-primary) px-5 py-3 text-sm font-black text-white transition hover:bg-(--sj-primary-dark)"
+                        disabled={isLoading || isAuthLoading}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-(--sj-primary) px-5 py-3 text-sm font-black text-white transition hover:bg-(--sj-primary-dark) disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <Plus className="h-4 w-4" />
                         Add contact
                     </button>
                 </div>
 
-                {saved && (
+                {pageError && (
+                    <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-600 dark:text-red-400">
+                        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+
+                        <div className="flex-1">
+                            <p>{pageError}</p>
+
+                            <button
+                                type="button"
+                                onClick={loadContacts}
+                                className="mt-2 text-xs font-black underline underline-offset-2"
+                            >
+                                Try again
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {actionError && (
+                    <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-600 dark:text-red-400">
+                        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+
+                        <p>{actionError}</p>
+
+                        <button
+                            type="button"
+                            onClick={() => setActionError('')}
+                            aria-label="Dismiss error"
+                            className="ml-auto shrink-0"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                )}
+
+                {successMessage && (
                     <div className="mb-6 flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-600 dark:text-emerald-400">
                         <CheckCircle2 className="h-5 w-5 shrink-0" />
-                        Emergency contacts updated successfully.
+
+                        <span>{successMessage}</span>
                     </div>
                 )}
 
@@ -196,23 +470,39 @@ function EmergencyContacts() {
                     </div>
                 </div>
 
-                <div className="space-y-4">
-                    {contacts.length === 0 ? (
-                        <EmptyContacts onAdd={openAddModal} />
-                    ) : (
-                        contacts.map((contact) => (
-                            <ContactCard
-                                key={contact.id}
-                                contact={contact}
-                                onEdit={() => openEditModal(contact)}
-                                onDelete={() => handleDelete(contact.id)}
-                                onMakePrimary={() =>
-                                    makePrimary(contact.id)
-                                }
+                {isAuthLoading || isLoading ? (
+                    <LoadingContacts />
+                ) : (
+                    <div className="space-y-4">
+                        {contacts.length === 0 ? (
+                            <EmptyContacts
+                                onAdd={openAddModal}
                             />
-                        ))
-                    )}
-                </div>
+                        ) : (
+                            contacts.map((contact) => (
+                                <ContactCard
+                                    key={contact.id}
+                                    contact={contact}
+                                    deleting={
+                                        deletingId === contact.id
+                                    }
+                                    makingPrimary={
+                                        primaryId === contact.id
+                                    }
+                                    onEdit={() =>
+                                        openEditModal(contact)
+                                    }
+                                    onDelete={() =>
+                                        handleDelete(contact)
+                                    }
+                                    onMakePrimary={() =>
+                                        makePrimary(contact)
+                                    }
+                                />
+                            ))
+                        )}
+                    </div>
+                )}
 
                 <div className="mt-8 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">
                     <div className="flex items-start gap-3">
@@ -237,6 +527,7 @@ function EmergencyContacts() {
                 <ContactModal
                     formData={formData}
                     editing={Boolean(editingId)}
+                    isSaving={isSaving}
                     onChange={handleChange}
                     onSave={handleSave}
                     onClose={closeModal}
@@ -246,11 +537,27 @@ function EmergencyContacts() {
     );
 }
 
+function LoadingContacts() {
+    return (
+        <div className="sj-card flex min-h-52 items-center justify-center px-6 py-12">
+            <div className="text-center">
+                <Loader2 className="mx-auto h-8 w-8 animate-spin text-(--sj-primary)" />
+
+                <p className="mt-4 text-sm font-bold text-(--sj-text-soft)">
+                    Loading emergency contacts...
+                </p>
+            </div>
+        </div>
+    );
+}
+
 function ContactCard({
     contact,
     onEdit,
     onDelete,
     onMakePrimary,
+    deleting,
+    makingPrimary,
 }) {
     return (
         <article className="sj-card p-5 sm:p-6">
@@ -266,7 +573,7 @@ function ContactCard({
                                 {contact.name}
                             </h2>
 
-                            {contact.primary && (
+                            {contact.is_primary && (
                                 <span className="sj-status sj-status-success">
                                     Primary
                                 </span>
@@ -280,12 +587,18 @@ function ContactCard({
                         <div className="mt-4 space-y-2">
                             <div className="flex items-center gap-2 text-sm text-(--sj-text-soft)">
                                 <Phone className="h-4 w-4 text-(--sj-primary)" />
-                                <span>{contact.phone}</span>
+
+                                <span>
+                                    {formatPhoneNumber(
+                                        contact.mobile_number,
+                                    )}
+                                </span>
                             </div>
 
                             {contact.email && (
                                 <div className="flex items-center gap-2 text-sm text-(--sj-text-soft)">
                                     <Mail className="h-4 w-4 text-(--sj-primary)" />
+
                                     <span className="break-all">
                                         {contact.email}
                                     </span>
@@ -296,21 +609,35 @@ function ContactCard({
                 </div>
 
                 <div className="flex flex-wrap gap-2 sm:justify-end">
-                    {!contact.primary && (
+                    {!contact.is_primary && (
                         <button
                             type="button"
                             onClick={onMakePrimary}
-                            className="rounded-lg border border-(--sj-border) px-3 py-2 text-xs font-bold text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-primary)"
+                            disabled={
+                                makingPrimary ||
+                                deleting
+                            }
+                            className="inline-flex items-center gap-2 rounded-lg border border-(--sj-border) px-3 py-2 text-xs font-bold text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-primary) disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            Make primary
+                            {makingPrimary && (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            )}
+
+                            {makingPrimary
+                                ? 'Updating...'
+                                : 'Make primary'}
                         </button>
                     )}
 
                     <button
                         type="button"
                         onClick={onEdit}
+                        disabled={
+                            deleting ||
+                            makingPrimary
+                        }
                         aria-label={`Edit ${contact.name}`}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-(--sj-border) text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-primary)"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-(--sj-border) text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-primary) disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <Edit3 className="h-4 w-4" />
                     </button>
@@ -318,10 +645,18 @@ function ContactCard({
                     <button
                         type="button"
                         onClick={onDelete}
+                        disabled={
+                            deleting ||
+                            makingPrimary
+                        }
                         aria-label={`Delete ${contact.name}`}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-500/15 text-red-500 transition hover:bg-red-500/10"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-500/15 text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <Trash2 className="h-4 w-4" />
+                        {deleting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Trash2 className="h-4 w-4" />
+                        )}
                     </button>
                 </div>
             </div>
@@ -348,7 +683,7 @@ function EmptyContacts({ onAdd }) {
             <button
                 type="button"
                 onClick={onAdd}
-                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-(--sj-primary) px-5 py-3 text-sm font-black text-white"
+                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-(--sj-primary) px-5 py-3 text-sm font-black text-white transition hover:bg-(--sj-primary-dark)"
             >
                 <Plus className="h-4 w-4" />
                 Add first contact
@@ -360,6 +695,7 @@ function EmptyContacts({ onAdd }) {
 function ContactModal({
     formData,
     editing,
+    isSaving,
     onChange,
     onSave,
     onClose,
@@ -383,14 +719,18 @@ function ContactModal({
                     <button
                         type="button"
                         onClick={onClose}
+                        disabled={isSaving}
                         aria-label="Close"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-(--sj-text-muted) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text)"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-(--sj-text-muted) transition hover:bg-(--sj-surface-2) hover:text-(--sj-text) disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <form onSubmit={onSave} className="p-5 sm:p-6">
+                <form
+                    onSubmit={onSave}
+                    className="p-5 sm:p-6"
+                >
                     <div className="space-y-5">
                         <div>
                             <label
@@ -406,6 +746,9 @@ function ContactModal({
                                 value={formData.name}
                                 onChange={onChange}
                                 required
+                                minLength={2}
+                                maxLength={150}
+                                disabled={isSaving}
                                 className="sj-input h-12 px-4 text-sm"
                                 placeholder="Enter full name"
                             />
@@ -425,6 +768,9 @@ function ContactModal({
                                 value={formData.relationship}
                                 onChange={onChange}
                                 required
+                                minLength={2}
+                                maxLength={50}
+                                disabled={isSaving}
                                 className="sj-input h-12 px-4 text-sm"
                                 placeholder="Example: Mother, spouse, brother"
                             />
@@ -445,9 +791,17 @@ function ContactModal({
                                 value={formData.phone}
                                 onChange={onChange}
                                 required
+                                minLength={10}
+                                maxLength={15}
+                                pattern="(?:\+91[\s-]?)?[6-9]\d{9}"
+                                disabled={isSaving}
                                 className="sj-input h-12 px-4 text-sm"
                                 placeholder="+91 98765 43210"
                             />
+
+                            <p className="mt-1.5 text-xs text-(--sj-text-muted)">
+                                Enter a valid 10-digit Indian mobile number.
+                            </p>
                         </div>
 
                         <div>
@@ -464,6 +818,7 @@ function ContactModal({
                                 type="email"
                                 value={formData.email}
                                 onChange={onChange}
+                                disabled={isSaving}
                                 className="sj-input h-12 px-4 text-sm"
                                 placeholder="contact@example.com"
                             />
@@ -475,6 +830,7 @@ function ContactModal({
                                 name="primary"
                                 checked={formData.primary}
                                 onChange={onChange}
+                                disabled={isSaving}
                                 className="mt-0.5 h-4 w-4 accent-(--sj-primary)"
                             />
 
@@ -495,22 +851,88 @@ function ContactModal({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="rounded-xl border border-(--sj-border) px-5 py-3 text-sm font-bold text-(--sj-text-soft) transition hover:text-(--sj-text)"
+                            disabled={isSaving}
+                            className="rounded-xl border border-(--sj-border) px-5 py-3 text-sm font-bold text-(--sj-text-soft) transition hover:text-(--sj-text) disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             Cancel
                         </button>
 
                         <button
                             type="submit"
-                            className="rounded-xl bg-(--sj-primary) px-5 py-3 text-sm font-black text-white transition hover:bg-(--sj-primary-dark)"
+                            disabled={isSaving}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-(--sj-primary) px-5 py-3 text-sm font-black text-white transition hover:bg-(--sj-primary-dark) disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            {editing ? 'Save changes' : 'Add contact'}
+                            {isSaving && (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            )}
+
+                            {isSaving
+                                ? 'Saving...'
+                                : editing
+                                    ? 'Save changes'
+                                    : 'Add contact'}
                         </button>
                     </div>
                 </form>
             </div>
         </div>
     );
+}
+
+function normalizePhone(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+
+    if (digits.startsWith('91') && digits.length === 12) {
+        return digits.slice(2);
+    }
+
+    return digits;
+}
+
+function formatPhoneNumber(value) {
+    const digits = normalizePhone(value);
+
+    if (digits.length === 10) {
+        return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+    }
+
+    return value || '';
+}
+
+function getApiErrorMessage(
+    error,
+    fallbackMessage,
+) {
+    const detail = error?.data?.detail;
+
+    if (Array.isArray(detail)) {
+        const message = detail
+            .map((item) => {
+                if (typeof item === 'string') {
+                    return item;
+                }
+
+                if (item?.msg) {
+                    return item.msg;
+                }
+
+                return null;
+            })
+            .filter(Boolean)
+            .join(' ');
+
+        return message || fallbackMessage;
+    }
+
+    if (typeof detail === 'string') {
+        return detail;
+    }
+
+    if (typeof error?.message === 'string') {
+        return error.message;
+    }
+
+    return fallbackMessage;
 }
 
 export default EmergencyContacts;

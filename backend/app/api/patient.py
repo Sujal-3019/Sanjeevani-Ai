@@ -16,6 +16,16 @@ from app.services.patient_profile_service import (
     PatientProfileService,
 )
 
+from app.schemas.sos_request import (
+    SOSRequestCreate,
+    SOSRequestResponse,
+)
+from app.services.sos_service import (
+    InvalidSOSRequestError,
+    PatientProfileRequiredError,
+    SOSService,
+)
+
 
 router = APIRouter(
     tags=["Patient"],
@@ -212,3 +222,46 @@ def update_patient_profile(
             detail=str(exc),
         ) from exc
 
+
+@router.post(
+    "/emergency/sos",
+    response_model=SOSRequestResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_emergency_sos(
+    data: SOSRequestCreate,
+    current_user: User = Depends(
+        patient_role_dependency,
+    ),
+    db: Session = Depends(get_db),
+):
+    try:
+        sos_request, emergency_event = (
+            SOSService.create_sos(
+                db=db,
+                user=current_user,
+                data=data,
+            )
+        )
+
+        return {
+            "id": sos_request.id,
+            "emergency_event_id": emergency_event.id,
+            "status": emergency_event.status.value,
+            "emergency_type": sos_request.emergency_type,
+            "emergency_details": sos_request.emergency_details,
+            "latitude": data.latitude,
+            "longitude": data.longitude,
+        }
+
+    except PatientProfileRequiredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    except InvalidSOSRequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc

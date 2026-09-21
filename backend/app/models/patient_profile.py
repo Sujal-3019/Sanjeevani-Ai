@@ -125,3 +125,10 @@ class PatientProfile(Base):
         passive_deletes=True,
         uselist=False,
     )
+
+    sos_requests: Mapped[list["SOSRequest"]] = relationship(
+        "SOSRequest",
+        back_populates="patient_profile",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

@@ -11,69 +11,235 @@ import {
     ShieldCheck,
     UserRound,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import PatientNavbar from '../../components/layout/PatientNavbar';
+import {
+    Link,
+    useSearchParams,
+} from 'react-router-dom';
 
-const emergency = {
-    id: 'SOS-2026-00481',
-    status: 'Ambulance on the way',
-    eta: '6 min',
-    distance: '2.4 km',
-    hospital: 'Sanjeevani Emergency Hospital',
-    hospitalDistance: '3.8 km',
-    ambulanceId: 'AMB-042',
-    paramedic: 'Rohan Mehta',
-    location: 'Connaught Place, New Delhi',
+import PatientNavbar from '../../components/layout/PatientNavbar';
+import authService from '../../services/authService';
+import emergencyService from '../../services/emergencyService';
+
+
+const STATUS_LABELS = {
+    CREATED: 'Emergency request created',
+    ASSESSING: 'Emergency being assessed',
+    COORDINATING: 'Emergency coordination in progress',
+    HOSPITAL_SELECTED: 'Hospital selected',
+    AMBULANCE_ASSIGNMENT: 'Finding an ambulance',
+    AMBULANCE_ASSIGNED: 'Ambulance assigned',
+    PARAMEDIC_ASSIGNED: 'Paramedic assigned',
+    PATIENT_PICKED_UP: 'Patient picked up',
+    TRANSPORTING: 'Transporting to hospital',
+    ARRIVED_AT_HOSPITAL: 'Arrived at hospital',
+    COMPLETED: 'Emergency completed',
+    CANCELLED: 'Emergency cancelled',
 };
 
-const timeline = [
-    {
-        title: 'Emergency request created',
-        description: 'SOS request received',
-        time: '10:42 AM',
-        complete: true,
-    },
-    {
-        title: 'Location captured',
-        description: 'Patient location confirmed',
-        time: '10:42 AM',
-        complete: true,
-    },
-    {
-        title: 'Emergency priority assessed',
-        description: 'AI-assisted triage completed',
-        time: '10:43 AM',
-        complete: true,
-    },
-    {
-        title: 'Hospital coordination completed',
-        description: 'Emergency hospital identified',
-        time: '10:43 AM',
-        complete: true,
-    },
-    {
-        title: 'Ambulance dispatched',
-        description: 'AMB-042 is travelling to your location',
-        time: '10:44 AM',
-        complete: true,
-        active: true,
-    },
-    {
-        title: 'Patient pickup',
-        description: 'Waiting for paramedic arrival',
-        time: 'Pending',
-        complete: false,
-    },
-];
+
+const EMERGENCY_TYPE_LABELS = {
+    CHEST_PAIN: 'Chest pain',
+    BREATHING_DIFFICULTY: 'Breathing difficulty',
+    STROKE: 'Possible stroke',
+    SEVERE_BLEEDING: 'Severe bleeding',
+    ROAD_ACCIDENT: 'Road accident',
+    BURNS: 'Serious burns',
+    UNCONSCIOUS: 'Unconscious person',
+    SEIZURE: 'Seizure',
+    PREGNANCY_EMERGENCY: 'Pregnancy emergency',
+    POISONING: 'Poisoning',
+    SEVERE_ALLERGIC_REACTION:
+        'Severe allergic reaction',
+    OTHER: 'Other emergency',
+};
+
+
+function formatEmergencyId(id) {
+    if (!id) {
+        return 'Emergency';
+    }
+
+    return `SOS ${id.slice(0, 8).toUpperCase()}`;
+}
+
+
+function getStatusLabel(status) {
+    return (
+        STATUS_LABELS[status] ||
+        status ||
+        'Emergency status unavailable'
+    );
+}
+
+
+function getEmergencyTypeLabel(type) {
+    return (
+        EMERGENCY_TYPE_LABELS[type] ||
+        type ||
+        'Emergency'
+    );
+}
+
 
 function TrackingPage() {
-    const [error, setError] = React.useState('');
+    const [searchParams] =
+        useSearchParams();
 
-    function handleCallParamedic() {
-        setError(
-            'Calling the assigned paramedic will be enabled when the backend communication service is connected.',
+    const emergencyId =
+        searchParams.get('emergency_id');
+
+    const [emergency, setEmergency] =
+        React.useState(null);
+
+    const [isLoading, setIsLoading] =
+        React.useState(true);
+
+    const [error, setError] =
+        React.useState('');
+
+    const [
+        isRefreshing,
+        setIsRefreshing,
+    ] = React.useState(false);
+
+
+    const loadEmergency =
+        React.useCallback(
+            async (showRefreshState = false) => {
+                if (!emergencyId) {
+                    setError(
+                        'No emergency request was selected.',
+                    );
+
+                    setIsLoading(false);
+
+                    return;
+                }
+
+                if (showRefreshState) {
+                    setIsRefreshing(true);
+                } else {
+                    setIsLoading(true);
+                }
+
+                setError('');
+
+                try {
+                    const token =
+                        authService.getAccessToken();
+
+                    if (!token) {
+                        throw new Error(
+                            'Your session has expired. Please log in again.',
+                        );
+                    }
+
+                    const data =
+                        await emergencyService.getSOS(
+                            emergencyId,
+                            token,
+                        );
+
+                    setEmergency(data);
+                } catch (requestError) {
+                    console.error(
+                        'Failed to load emergency:',
+                        requestError,
+                    );
+
+                    setError(
+                        requestError?.message ||
+                        'Unable to load your emergency request.',
+                    );
+                } finally {
+                    setIsLoading(false);
+                    setIsRefreshing(false);
+                }
+            },
+            [
+                emergencyId,
+            ],
+        );
+
+
+    React.useEffect(() => {
+        loadEmergency();
+    }, [
+        loadEmergency,
+    ]);
+
+
+    if (isLoading) {
+        return (
+            <div className="sanjeevani-page min-h-screen">
+                <PatientNavbar />
+
+                <main className="flex min-h-[70vh] items-center justify-center px-5 py-10">
+                    <div className="text-center">
+                        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-(--sj-primary)/20 border-t-(--sj-primary)" />
+
+                        <p className="mt-4 text-sm font-bold text-(--sj-text-soft)">
+                            Loading emergency details...
+                        </p>
+                    </div>
+                </main>
+            </div>
         );
     }
+
+
+    if (error || !emergency) {
+        return (
+            <div className="sanjeevani-page min-h-screen">
+                <PatientNavbar />
+
+                <main className="mx-auto max-w-4xl px-5 py-10 sm:px-8">
+                    <Link
+                        to="/dashboard/patient"
+                        className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-(--sj-primary)"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to dashboard
+                    </Link>
+
+                    <div className="sj-card p-8 text-center">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10 text-red-500">
+                            <ShieldCheck className="h-7 w-7" />
+                        </div>
+
+                        <h1 className="mt-5 text-2xl font-black text-(--sj-text)">
+                            Emergency information unavailable
+                        </h1>
+
+                        <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-(--sj-text-soft)">
+                            {error ||
+                                'We could not find this emergency request.'}
+                        </p>
+
+                        <Link
+                            to="/dashboard/patient"
+                            className="mt-6 inline-flex items-center justify-center rounded-xl bg-(--sj-primary) px-5 py-3 text-sm font-bold text-white"
+                        >
+                            Return to dashboard
+                        </Link>
+                    </div>
+                </main>
+            </div>
+        );
+    }
+
+
+    const status =
+        emergency.status;
+
+    const statusLabel =
+        getStatusLabel(status);
+
+    const emergencyType =
+        getEmergencyTypeLabel(
+            emergency.emergency_type,
+        );
+
 
     return (
         <div className="sanjeevani-page min-h-screen">
@@ -84,52 +250,94 @@ function TrackingPage() {
                     <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
                         <div>
                             <p className="text-xs font-black uppercase tracking-[0.18em] text-(--sj-primary)">
-                                Emergency {emergency.id}
+                                {formatEmergencyId(
+                                    emergency.id,
+                                )}
                             </p>
 
                             <h1 className="mt-2 text-3xl font-black tracking-[-0.035em] text-(--sj-text) sm:text-4xl">
-                                {emergency.status}
+                                {statusLabel}
                             </h1>
 
-                            <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
-                                Your assigned ambulance is travelling to your
-                                location.
+                            <p className="mt-2 max-w-2xl text-sm leading-6 text-(--sj-text-soft)">
+                                Your emergency request is being handled through Sanjeevani.
                             </p>
                         </div>
 
-                        <span className="sj-status sj-status-success w-fit">
-                            <span className="sj-live-dot" />
-                            Coordination active
-                        </span>
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    loadEmergency(
+                                        true,
+                                    )
+                                }
+                                disabled={
+                                    isRefreshing
+                                }
+                                className="inline-flex items-center justify-center rounded-xl border border-(--sj-border) bg-(--sj-surface) px-4 py-2.5 text-xs font-bold text-(--sj-text) transition hover:border-(--sj-primary)/40 hover:text-(--sj-primary) disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {isRefreshing
+                                    ? 'Refreshing...'
+                                    : 'Refresh'}
+                            </button>
+
+                            <span className="sj-status sj-status-success w-fit">
+                                <span className="sj-live-dot" />
+
+                                Live status
+                            </span>
+                        </div>
                     </div>
                 </div>
 
+
                 <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
                     <section className="space-y-6">
-                        <TrackingMap />
+                        <TrackingMap
+                            emergency={
+                                emergency
+                            }
+                        />
 
                         <div className="grid gap-4 sm:grid-cols-3">
                             <InfoCard
                                 icon={Clock3}
-                                label="Estimated arrival"
-                                value={emergency.eta}
-                                description="Based on current route"
+                                label="Status"
+                                value={
+                                    statusLabel
+                                }
+                                description="Current emergency status"
                             />
 
                             <InfoCard
-                                icon={Navigation}
-                                label="Distance"
-                                value={emergency.distance}
-                                description="Ambulance to you"
+                                icon={
+                                    Navigation
+                                }
+                                label="Emergency type"
+                                value={
+                                    emergencyType
+                                }
+                                description="Information provided during SOS"
                             />
 
                             <InfoCard
-                                icon={Hospital}
-                                label="Hospital"
-                                value={emergency.hospitalDistance}
-                                description="Destination"
+                                icon={
+                                    MapPin
+                                }
+                                label="Location"
+                                value={
+                                    emergency.latitude !==
+                                        null &&
+                                    emergency.longitude !==
+                                        null
+                                        ? 'GPS captured'
+                                        : 'Captured'
+                                }
+                                description="Current emergency location"
                             />
                         </div>
+
 
                         <div className="sj-card p-5 sm:p-6">
                             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
@@ -140,41 +348,47 @@ function TrackingPage() {
 
                                     <div>
                                         <p className="text-xs font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                                            Assigned ambulance
+                                            Ambulance
                                         </p>
 
                                         <h2 className="mt-1 text-lg font-black text-(--sj-text)">
-                                            {emergency.ambulanceId}
+                                            Not assigned yet
                                         </h2>
 
                                         <p className="mt-1 text-sm text-(--sj-text-soft)">
-                                            {emergency.paramedic}
+                                            Ambulance assignment will appear here when coordination begins.
                                         </p>
                                     </div>
                                 </div>
 
                                 <button
                                     type="button"
-                                    onClick={handleCallParamedic}
-                                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-(--sj-border) bg-(--sj-surface) px-5 py-3 text-sm font-bold text-(--sj-text) transition hover:border-(--sj-primary)/40 hover:text-(--sj-primary)"
+                                    disabled
+                                    className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-(--sj-border) bg-(--sj-surface) px-5 py-3 text-sm font-bold text-(--sj-text-muted) opacity-60"
                                 >
                                     <Phone className="h-4 w-4" />
                                     Contact paramedic
                                 </button>
                             </div>
-
-                            {error && (
-                                <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs font-semibold leading-5 text-amber-600 dark:text-amber-400">
-                                    {error}
-                                </div>
-                            )}
                         </div>
                     </section>
+
 
                     <aside className="space-y-6">
                         <HospitalCard />
 
-                        <Timeline />
+                        <Timeline
+                            status={status}
+                            emergency={
+                                emergency
+                            }
+                        />
+
+                        <EmergencyDetails
+                            emergency={
+                                emergency
+                            }
+                        />
 
                         <SafetyCard />
                     </aside>
@@ -184,60 +398,75 @@ function TrackingPage() {
     );
 }
 
-function TrackingMap() {
+
+function TrackingMap({
+    emergency,
+}) {
+    const hasCoordinates =
+        emergency.latitude !==
+            null &&
+        emergency.longitude !==
+            null;
+
+
     return (
         <div className="sj-map min-h-107.5">
             <div className="sj-map-grid" />
 
             <div className="relative min-h-107.5 overflow-hidden">
-                <div className="absolute left-[18%] top-[23%] h-1 w-[48%] rotate-18 rounded-full bg-(--sj-primary)/25" />
-
-                <div className="absolute left-[18%] top-[23%] h-1 w-[48%] rotate-18 rounded-full border-t-2 border-dashed border-(--sj-primary)" />
-
-                <div className="absolute left-[18%] top-[23%] flex h-11 w-11 items-center justify-center rounded-full bg-(--sj-surface) text-red-500 shadow-lg ring-4 ring-red-500/10">
-                    <MapPin className="h-5 w-5" />
+                <div className="absolute left-[18%] top-[35%] flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white shadow-xl ring-8 ring-red-500/10">
+                    <MapPin className="h-6 w-6" />
                 </div>
 
-                <div className="absolute left-[57%] top-[42%] flex h-14 w-14 items-center justify-center rounded-full bg-(--sj-primary) text-white shadow-xl ring-8 ring-(--sj-primary)/10">
-                    <Ambulance className="h-6 w-6" />
+
+                <div className="absolute right-[18%] top-[30%] flex h-12 w-12 items-center justify-center rounded-full bg-(--sj-surface) text-(--sj-text-muted) shadow-lg ring-4 ring-(--sj-border)">
+                    <Ambulance className="h-5 w-5" />
                 </div>
 
-                <div className="absolute right-[15%] bottom-[18%] flex h-12 w-12 items-center justify-center rounded-full bg-(--sj-surface) text-(--sj-primary) shadow-lg ring-4 ring-(--sj-primary)/10">
+
+                <div className="absolute right-[15%] bottom-[18%] flex h-12 w-12 items-center justify-center rounded-full bg-(--sj-surface) text-(--sj-text-muted) shadow-lg ring-4 ring-(--sj-border)">
                     <Hospital className="h-5 w-5" />
                 </div>
+
 
                 <div className="absolute left-4 top-4 rounded-xl border border-(--sj-border) bg-(--sj-surface)/95 px-4 py-3 shadow-sm backdrop-blur">
                     <div className="flex items-center gap-2">
                         <span className="sj-live-dot" />
 
                         <span className="text-xs font-black text-(--sj-text)">
-                            Live ambulance location
+                            Emergency location
                         </span>
                     </div>
 
                     <p className="mt-1 text-[11px] text-(--sj-text-muted)">
-                        Demo tracking view
+                        {hasCoordinates
+                            ? 'GPS location captured'
+                            : 'Location captured'}
                     </p>
                 </div>
+
 
                 <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface)/95 px-4 py-3 shadow-sm backdrop-blur">
                         <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                            Your location
+                            Patient location
                         </p>
 
                         <p className="mt-1 text-xs font-black text-(--sj-text)">
-                            {emergency.location}
+                            {hasCoordinates
+                                ? `${emergency.latitude.toFixed(5)}, ${emergency.longitude.toFixed(5)}`
+                                : 'GPS coordinates captured'}
                         </p>
                     </div>
 
+
                     <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface)/95 px-4 py-3 shadow-sm backdrop-blur">
                         <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                            Ambulance ETA
+                            Ambulance
                         </p>
 
-                        <p className="mt-1 text-sm font-black text-(--sj-primary)">
-                            {emergency.eta}
+                        <p className="mt-1 text-sm font-black text-(--sj-text-muted)">
+                            Not assigned
                         </p>
                     </div>
                 </div>
@@ -245,6 +474,7 @@ function TrackingMap() {
         </div>
     );
 }
+
 
 function InfoCard({
     icon: Icon,
@@ -259,12 +489,12 @@ function InfoCard({
                     <Icon className="h-5 w-5" />
                 </div>
 
-                <div>
+                <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
                         {label}
                     </p>
 
-                    <p className="mt-1 text-lg font-black text-(--sj-text)">
+                    <p className="mt-1 truncate text-lg font-black text-(--sj-text)">
                         {value}
                     </p>
                 </div>
@@ -276,6 +506,7 @@ function InfoCard({
         </div>
     );
 }
+
 
 function HospitalCard() {
     return (
@@ -292,7 +523,7 @@ function HospitalCard() {
                         </p>
 
                         <h2 className="mt-1 text-base font-black text-(--sj-text)">
-                            Emergency hospital
+                            Hospital coordination
                         </h2>
                     </div>
                 </div>
@@ -300,26 +531,25 @@ function HospitalCard() {
 
             <div className="p-5">
                 <h3 className="text-base font-black text-(--sj-text)">
-                    {emergency.hospital}
+                    Hospital not selected yet
                 </h3>
 
                 <div className="mt-4 flex items-start gap-3">
-                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-(--sj-primary)" />
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-(--sj-text-muted)" />
 
                     <p className="text-sm leading-6 text-(--sj-text-soft)">
-                        Emergency destination · {emergency.hospitalDistance}
-                        away
+                        A suitable emergency hospital will appear here once hospital coordination is completed.
                     </p>
                 </div>
 
                 <div className="mt-5 rounded-xl bg-(--sj-surface-2) p-4">
                     <div className="flex items-center justify-between gap-4">
                         <span className="text-xs font-bold text-(--sj-text-soft)">
-                            Estimated arrival
+                            Destination status
                         </span>
 
-                        <span className="text-sm font-black text-(--sj-primary)">
-                            {emergency.eta}
+                        <span className="text-sm font-black text-(--sj-text-muted)">
+                            Pending
                         </span>
                     </div>
                 </div>
@@ -328,7 +558,114 @@ function HospitalCard() {
     );
 }
 
-function Timeline() {
+
+function Timeline({
+    status,
+    emergency,
+}) {
+    const steps = [
+        {
+            title: 'Emergency request created',
+            description:
+                'SOS request received by Sanjeevani',
+            active:
+                status === 'CREATED',
+            complete:
+                true,
+        },
+        {
+            title: 'Emergency assessment',
+            description:
+                'Emergency severity assessment',
+            active:
+                status === 'ASSESSING',
+            complete:
+                [
+                    'COORDINATING',
+                    'HOSPITAL_SELECTED',
+                    'AMBULANCE_ASSIGNMENT',
+                    'AMBULANCE_ASSIGNED',
+                    'PARAMEDIC_ASSIGNED',
+                    'PATIENT_PICKED_UP',
+                    'TRANSPORTING',
+                    'ARRIVED_AT_HOSPITAL',
+                    'COMPLETED',
+                ].includes(status),
+        },
+        {
+            title: 'Hospital coordination',
+            description:
+                'Suitable emergency hospital selection',
+            active:
+                status === 'COORDINATING',
+            complete:
+                [
+                    'HOSPITAL_SELECTED',
+                    'AMBULANCE_ASSIGNMENT',
+                    'AMBULANCE_ASSIGNED',
+                    'PARAMEDIC_ASSIGNED',
+                    'PATIENT_PICKED_UP',
+                    'TRANSPORTING',
+                    'ARRIVED_AT_HOSPITAL',
+                    'COMPLETED',
+                ].includes(status),
+        },
+        {
+            title: 'Ambulance coordination',
+            description:
+                'Finding and assigning an available ambulance',
+            active:
+                status === 'AMBULANCE_ASSIGNMENT',
+            complete:
+                [
+                    'AMBULANCE_ASSIGNED',
+                    'PARAMEDIC_ASSIGNED',
+                    'PATIENT_PICKED_UP',
+                    'TRANSPORTING',
+                    'ARRIVED_AT_HOSPITAL',
+                    'COMPLETED',
+                ].includes(status),
+        },
+        {
+            title: 'Ambulance assigned',
+            description:
+                'An ambulance and paramedic are assigned',
+            active:
+                status === 'AMBULANCE_ASSIGNED' ||
+                status === 'PARAMEDIC_ASSIGNED',
+            complete:
+                [
+                    'PATIENT_PICKED_UP',
+                    'TRANSPORTING',
+                    'ARRIVED_AT_HOSPITAL',
+                    'COMPLETED',
+                ].includes(status),
+        },
+        {
+            title: 'Patient pickup',
+            description:
+                'Paramedic reaches the patient',
+            active:
+                status === 'PATIENT_PICKED_UP',
+            complete:
+                [
+                    'TRANSPORTING',
+                    'ARRIVED_AT_HOSPITAL',
+                    'COMPLETED',
+                ].includes(status),
+        },
+        {
+            title: 'Hospital arrival',
+            description:
+                'Patient reaches the selected hospital',
+            active:
+                status === 'ARRIVED_AT_HOSPITAL',
+            complete:
+                status === 'COMPLETED',
+        },
+    ];
+
+
     return (
         <div className="sj-card p-5 sm:p-6">
             <div className="mb-6">
@@ -339,42 +676,57 @@ function Timeline() {
                 <h2 className="mt-1 text-lg font-black text-(--sj-text)">
                     Coordination progress
                 </h2>
+
+                <p className="mt-2 text-xs text-(--sj-text-soft)">
+                    {emergency.emergency_type
+                        ? getEmergencyTypeLabel(
+                              emergency.emergency_type,
+                          )
+                        : 'Emergency'}
+                </p>
             </div>
 
             <div className="space-y-0">
-                {timeline.map((item, index) => (
-                    <div
-                        key={item.title}
-                        className="relative flex gap-4 pb-6 last:pb-0"
-                    >
-                        {index < timeline.length - 1 && (
-                            <div
-                                className={`absolute left-3.75 top-8 h-[calc(100%-1rem)] w-px ${
-                                    item.complete
-                                        ? 'bg-emerald-500/30'
-                                        : 'bg-(--sj-border)'
-                                }`}
-                            />
-                        )}
-
+                {steps.map(
+                    (
+                        item,
+                        index,
+                    ) => (
                         <div
-                            className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                item.active
-                                    ? 'bg-(--sj-primary) text-white'
-                                    : item.complete
-                                      ? 'bg-emerald-500/10 text-emerald-500'
-                                      : 'bg-(--sj-surface-2) text-(--sj-text-muted)'
-                            }`}
+                            key={
+                                item.title
+                            }
+                            className="relative flex gap-4 pb-6 last:pb-0"
                         >
-                            {item.complete ? (
-                                <CheckCircle2 className="h-4 w-4" />
-                            ) : (
-                                <Clock3 className="h-4 w-4" />
+                            {index <
+                                steps.length -
+                                    1 && (
+                                <div
+                                    className={`absolute left-3.75 top-8 h-[calc(100%-1rem)] w-px ${
+                                        item.complete
+                                            ? 'bg-emerald-500/30'
+                                            : 'bg-(--sj-border)'
+                                    }`}
+                                />
                             )}
-                        </div>
 
-                        <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-3">
+                            <div
+                                className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                                    item.active
+                                        ? 'bg-(--sj-primary) text-white'
+                                        : item.complete
+                                          ? 'bg-emerald-500/10 text-emerald-500'
+                                          : 'bg-(--sj-surface-2) text-(--sj-text-muted)'
+                                }`}
+                            >
+                                {item.complete ? (
+                                    <CheckCircle2 className="h-4 w-4" />
+                                ) : (
+                                    <Clock3 className="h-4 w-4" />
+                                )}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
                                 <p
                                     className={`text-sm font-black ${
                                         item.complete
@@ -382,31 +734,85 @@ function Timeline() {
                                             : 'text-(--sj-text-muted)'
                                     }`}
                                 >
-                                    {item.title}
+                                    {
+                                        item.title
+                                    }
                                 </p>
 
-                                <span className="shrink-0 text-[10px] font-bold text-(--sj-text-muted)">
-                                    {item.time}
-                                </span>
+                                <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
+                                    {
+                                        item.description
+                                    }
+                                </p>
+
+                                {item.active && (
+                                    <span className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-(--sj-primary)">
+                                        <span className="sj-live-dot" />
+                                        Current
+                                    </span>
+                                )}
                             </div>
-
-                            <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
-                                {item.description}
-                            </p>
-
-                            {item.active && (
-                                <span className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-(--sj-primary)">
-                                    <span className="sj-live-dot" />
-                                    Active
-                                </span>
-                            )}
                         </div>
-                    </div>
-                ))}
+                    ),
+                )}
             </div>
         </div>
     );
 }
+
+
+function EmergencyDetails({
+    emergency,
+}) {
+    return (
+        <div className="sj-card p-5 sm:p-6">
+            <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-(--sj-primary)/10 text-(--sj-primary)">
+                    <UserRound className="h-5 w-5" />
+                </div>
+
+                <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
+                        Emergency information
+                    </p>
+
+                    <h2 className="mt-1 text-lg font-black text-(--sj-text)">
+                        What you reported
+                    </h2>
+                </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+                <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
+                        Emergency type
+                    </p>
+
+                    <p className="mt-1 text-sm font-black text-(--sj-text)">
+                        {getEmergencyTypeLabel(
+                            emergency.emergency_type,
+                        )}
+                    </p>
+                </div>
+
+                {emergency.emergency_details && (
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
+                            Additional details
+                        </p>
+
+                        <p className="mt-1 text-sm leading-6 text-(--sj-text-soft)">
+                            {
+                                emergency.emergency_details
+                            }
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 
 function SafetyCard() {
     return (
@@ -420,14 +826,13 @@ function SafetyCard() {
                     </h2>
 
                     <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
-                        Keep your phone nearby and remain at the shared
-                        location if it is safe to do so. The paramedic will
-                        receive the emergency details through Sanjeevani.
+                        Keep your phone nearby and remain at the shared location if it is safe to do so. Emergency coordination updates will appear here as the backend workflow progresses.
                     </p>
                 </div>
             </div>
         </div>
     );
 }
+
 
 export default TrackingPage;

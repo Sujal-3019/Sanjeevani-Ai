@@ -2,6 +2,10 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import select
+from app.models.patient_profile import PatientProfile
+from app.models.emergency_event import EmergencyEvent
+from app.models.sos_request import SOSRequest
 
 from app.core.security import get_current_user, require_roles
 from app.db.session import get_db
@@ -265,3 +269,56 @@ def create_emergency_sos(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
+
+@router.get(
+    "/emergency/{sos_id}",
+    response_model=SOSRequestResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_emergency_sos(
+    sos_id: uuid.UUID,
+    current_user: User = Depends(
+        patient_role_dependency,
+    ),
+    db: Session = Depends(get_db),
+):
+    sos_request = db.scalar(
+        select(SOSRequest)
+        .join(
+            PatientProfile,
+            PatientProfile.id == SOSRequest.patient_profile_id,
+        )
+        .where(
+            SOSRequest.id == sos_id,
+            PatientProfile.user_id == current_user.id,
+        )
+    )
+
+    if sos_request is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Emergency request not found.",
+        )
+
+    emergency_event = db.scalar(
+        select(EmergencyEvent).where(
+            EmergencyEvent.sos_request_id == sos_request.id,
+        )
+    )
+
+    if emergency_event is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Emergency event not found.",
+        )
+
+    return {
+        "id": sos_request.id,
+        "emergency_event_id": emergency_event.id,
+        "status": emergency_event.status.value,
+        "emergency_type": sos_request.emergency_type,
+        "emergency_details": sos_request.emergency_details,
+        "latitude": None,
+        "longitude": None,
+    }

@@ -43,5 +43,5 @@ class SOSRequestResponse(BaseModel):
     status: str
     emergency_type: EmergencyType
     emergency_details: str | None
-    latitude: float
-    longitude: float
+    latitude: float | None = None
+    longitude: float | None = None

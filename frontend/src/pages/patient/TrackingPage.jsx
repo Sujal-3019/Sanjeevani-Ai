@@ -15,6 +15,14 @@ import {
     Link,
     useSearchParams,
 } from 'react-router-dom';
+import {
+    CircleMarker,
+    MapContainer,
+    Popup,
+    TileLayer,
+    useMap,
+} from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 
 import PatientNavbar from '../../components/layout/PatientNavbar';
 import authService from '../../services/authService';
@@ -329,7 +337,7 @@ function TrackingPage() {
                                 value={
                                     emergency.latitude !==
                                         null &&
-                                    emergency.longitude !==
+                                        emergency.longitude !==
                                         null
                                         ? 'GPS captured'
                                         : 'Captured'
@@ -402,76 +410,191 @@ function TrackingPage() {
 function TrackingMap({
     emergency,
 }) {
+    const latitude =
+        Number(emergency.latitude);
+
+    const longitude =
+        Number(emergency.longitude);
+
     const hasCoordinates =
-        emergency.latitude !==
-            null &&
-        emergency.longitude !==
-            null;
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude) &&
+        latitude >= -90 &&
+        latitude <= 90 &&
+        longitude >= -180 &&
+        longitude <= 180;
+
+
+    if (!hasCoordinates) {
+        return (
+            <div className="sj-card flex min-h-107.5 items-center justify-center p-6">
+                <div className="max-w-md text-center">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600">
+                        <MapPin className="h-7 w-7" />
+                    </div>
+
+                    <h2 className="mt-4 text-lg font-black text-(--sj-text)">
+                        Location unavailable
+                    </h2>
+
+                    <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
+                        The emergency was created, but valid GPS coordinates are not available for this request.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
 
     return (
-        <div className="sj-map min-h-107.5">
-            <div className="sj-map-grid" />
+        <div className="relative overflow-hidden rounded-3xl border border-(--sj-border) bg-(--sj-surface) shadow-sm">
+            <MapContainer
+                center={[
+                    latitude,
+                    longitude,
+                ]}
+                zoom={16}
+                scrollWheelZoom={true}
+                className="h-107.5 w-full"
+            >
+                <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
 
-            <div className="relative min-h-107.5 overflow-hidden">
-                <div className="absolute left-[18%] top-[35%] flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white shadow-xl ring-8 ring-red-500/10">
-                    <MapPin className="h-6 w-6" />
-                </div>
+                <CircleMarker
+                    center={[
+                        latitude,
+                        longitude,
+                    ]}
+                    radius={11}
+                    pathOptions={{
+                        color: '#dc2626',
+                        fillColor: '#dc2626',
+                        fillOpacity: 0.95,
+                        weight: 3,
+                    }}
+                >
+                    <Popup>
+                        <div className="min-w-45">
+                            <p className="text-sm font-bold">
+                                Your emergency location
+                            </p>
+
+                            <p className="mt-1 text-xs text-gray-600">
+                                {getEmergencyTypeLabel(
+                                    emergency.emergency_type,
+                                )}
+                            </p>
+
+                            <p className="mt-2 text-xs text-gray-500">
+                                {latitude.toFixed(
+                                    6,
+                                )}
+                                ,{' '}
+                                {longitude.toFixed(
+                                    6,
+                                )}
+                            </p>
+                        </div>
+                    </Popup>
+                </CircleMarker>
+
+                <MapRecenterButton
+                    latitude={
+                        latitude
+                    }
+                    longitude={
+                        longitude
+                    }
+                />
+            </MapContainer>
 
 
-                <div className="absolute right-[18%] top-[30%] flex h-12 w-12 items-center justify-center rounded-full bg-(--sj-surface) text-(--sj-text-muted) shadow-lg ring-4 ring-(--sj-border)">
-                    <Ambulance className="h-5 w-5" />
-                </div>
-
-
-                <div className="absolute right-[15%] bottom-[18%] flex h-12 w-12 items-center justify-center rounded-full bg-(--sj-surface) text-(--sj-text-muted) shadow-lg ring-4 ring-(--sj-border)">
-                    <Hospital className="h-5 w-5" />
-                </div>
-
-
-                <div className="absolute left-4 top-4 rounded-xl border border-(--sj-border) bg-(--sj-surface)/95 px-4 py-3 shadow-sm backdrop-blur">
+            <div className="pointer-events-none absolute left-4 top-4 z-400">
+                <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface)/95 px-4 py-3 shadow-sm backdrop-blur">
                     <div className="flex items-center gap-2">
                         <span className="sj-live-dot" />
 
                         <span className="text-xs font-black text-(--sj-text)">
-                            Emergency location
+                            Your emergency location
                         </span>
                     </div>
 
                     <p className="mt-1 text-[11px] text-(--sj-text-muted)">
-                        {hasCoordinates
-                            ? 'GPS location captured'
-                            : 'Location captured'}
+                        GPS coordinates from your SOS request
+                    </p>
+                </div>
+            </div>
+
+
+            <div className="pointer-events-none absolute bottom-4 left-4 right-4 z-400 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface)/95 px-4 py-3 shadow-sm backdrop-blur">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
+                        Patient location
+                    </p>
+
+                    <p className="mt-1 text-xs font-black text-(--sj-text)">
+                        {latitude.toFixed(
+                            6,
+                        )}
+                        ,{' '}
+                        {longitude.toFixed(
+                            6,
+                        )}
                     </p>
                 </div>
 
 
-                <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                    <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface)/95 px-4 py-3 shadow-sm backdrop-blur">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                            Patient location
-                        </p>
+                <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface)/95 px-4 py-3 shadow-sm backdrop-blur">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
+                        Ambulance
+                    </p>
 
-                        <p className="mt-1 text-xs font-black text-(--sj-text)">
-                            {hasCoordinates
-                                ? `${emergency.latitude.toFixed(5)}, ${emergency.longitude.toFixed(5)}`
-                                : 'GPS coordinates captured'}
-                        </p>
-                    </div>
-
-
-                    <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface)/95 px-4 py-3 shadow-sm backdrop-blur">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                            Ambulance
-                        </p>
-
-                        <p className="mt-1 text-sm font-black text-(--sj-text-muted)">
-                            Not assigned
-                        </p>
-                    </div>
+                    <p className="mt-1 text-sm font-black text-(--sj-text-muted)">
+                        Not assigned
+                    </p>
                 </div>
             </div>
         </div>
+    );
+}
+
+
+function MapRecenterButton({
+    latitude,
+    longitude,
+}) {
+    const map =
+        useMap();
+
+
+    function handleRecenter() {
+        map.flyTo(
+            [
+                latitude,
+                longitude,
+            ],
+            16,
+            {
+                duration: 0.8,
+            },
+        );
+    }
+
+
+    return (
+        <button
+            type="button"
+            onClick={
+                handleRecenter
+            }
+            className="absolute bottom-5 right-5 z-500 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-(--sj-border) bg-(--sj-surface) text-(--sj-primary) shadow-lg transition hover:scale-105 hover:bg-(--sj-background)"
+            title="Center on your emergency location"
+            aria-label="Center on your emergency location"
+        >
+            <Navigation className="h-5 w-5" />
+        </button>
     );
 }
 
@@ -680,8 +803,8 @@ function Timeline({
                 <p className="mt-2 text-xs text-(--sj-text-soft)">
                     {emergency.emergency_type
                         ? getEmergencyTypeLabel(
-                              emergency.emergency_type,
-                          )
+                            emergency.emergency_type,
+                        )
                         : 'Emergency'}
                 </p>
             </div>
@@ -700,24 +823,22 @@ function Timeline({
                         >
                             {index <
                                 steps.length -
-                                    1 && (
-                                <div
-                                    className={`absolute left-3.75 top-8 h-[calc(100%-1rem)] w-px ${
-                                        item.complete
-                                            ? 'bg-emerald-500/30'
-                                            : 'bg-(--sj-border)'
-                                    }`}
-                                />
-                            )}
+                                1 && (
+                                    <div
+                                        className={`absolute left-3.75 top-8 h-[calc(100%-1rem)] w-px ${item.complete
+                                                ? 'bg-emerald-500/30'
+                                                : 'bg-(--sj-border)'
+                                            }`}
+                                    />
+                                )}
 
                             <div
-                                className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                    item.active
+                                className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${item.active
                                         ? 'bg-(--sj-primary) text-white'
                                         : item.complete
-                                          ? 'bg-emerald-500/10 text-emerald-500'
-                                          : 'bg-(--sj-surface-2) text-(--sj-text-muted)'
-                                }`}
+                                            ? 'bg-emerald-500/10 text-emerald-500'
+                                            : 'bg-(--sj-surface-2) text-(--sj-text-muted)'
+                                    }`}
                             >
                                 {item.complete ? (
                                     <CheckCircle2 className="h-4 w-4" />
@@ -728,11 +849,10 @@ function Timeline({
 
                             <div className="min-w-0 flex-1">
                                 <p
-                                    className={`text-sm font-black ${
-                                        item.complete
+                                    className={`text-sm font-black ${item.complete
                                             ? 'text-(--sj-text)'
                                             : 'text-(--sj-text-muted)'
-                                    }`}
+                                        }`}
                                 >
                                     {
                                         item.title

@@ -1,8 +1,10 @@
 import uuid
-
+from geoalchemy2 import Geometry
 from fastapi import APIRouter, Depends, HTTPException, status
+from geoalchemy2.functions import ST_X, ST_Y
+from sqlalchemy import select , cast
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+
 from app.models.patient_profile import PatientProfile
 from app.models.emergency_event import EmergencyEvent
 from app.models.sos_request import SOSRequest
@@ -283,35 +285,51 @@ def get_emergency_sos(
     ),
     db: Session = Depends(get_db),
 ):
-    sos_request = db.scalar(
-        select(SOSRequest)
+    result = db.execute(
+        select(
+            SOSRequest,
+            EmergencyEvent,
+            ST_Y(
+                cast(
+                    SOSRequest.location,
+                    Geometry,
+                ),
+            ).label("latitude"),
+            ST_X(
+                cast(
+                    SOSRequest.location,
+                    Geometry,
+                ),
+            ).label("longitude"),
+        )
         .join(
             PatientProfile,
-            PatientProfile.id == SOSRequest.patient_profile_id,
+            PatientProfile.id
+            == SOSRequest.patient_profile_id,
+        )
+        .join(
+            EmergencyEvent,
+            EmergencyEvent.sos_request_id
+            == SOSRequest.id,
         )
         .where(
             SOSRequest.id == sos_id,
             PatientProfile.user_id == current_user.id,
         )
-    )
+    ).first()
 
-    if sos_request is None:
+    if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Emergency request not found.",
         )
 
-    emergency_event = db.scalar(
-        select(EmergencyEvent).where(
-            EmergencyEvent.sos_request_id == sos_request.id,
-        )
-    )
-
-    if emergency_event is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Emergency event not found.",
-        )
+    (
+        sos_request,
+        emergency_event,
+        latitude,
+        longitude,
+    ) = result
 
     return {
         "id": sos_request.id,
@@ -319,6 +337,6 @@ def get_emergency_sos(
         "status": emergency_event.status.value,
         "emergency_type": sos_request.emergency_type,
         "emergency_details": sos_request.emergency_details,
-        "latitude": None,
-        "longitude": None,
+        "latitude": float(latitude),
+        "longitude": float(longitude),
     }

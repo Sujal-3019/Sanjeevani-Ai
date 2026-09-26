@@ -11,7 +11,7 @@ import {
     UserRound,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-
+import authService from '../../services/authService';
 import AuthLayout from '../../layouts/AuthLayout';
 import {
     createPatientProfile,
@@ -174,7 +174,15 @@ function PatientProfileSetup() {
             setError('');
 
             try {
-                const profile = await getPatientProfile();
+                const token = authService.getAccessToken();
+
+                if (!token) {
+                    throw new Error(
+                        'Your session has expired. Please log in again.',
+                    );
+                }
+
+                const profile = await getPatientProfile(token);
 
                 if (!isMounted || !profile) {
                     return;
@@ -217,13 +225,13 @@ function PatientProfileSetup() {
 
                     height:
                         profile.height_cm !== null &&
-                        profile.height_cm !== undefined
+                            profile.height_cm !== undefined
                             ? String(profile.height_cm)
                             : '',
 
                     weight:
                         profile.weight_kg !== null &&
-                        profile.weight_kg !== undefined
+                            profile.weight_kg !== undefined
                             ? String(profile.weight_kg)
                             : '',
 
@@ -492,7 +500,7 @@ function PatientProfileSetup() {
 
             pregnancy_status:
                 shouldAskPregnancyStatus &&
-                formData.pregnancyStatus
+                    formData.pregnancyStatus
                     ? formData.pregnancyStatus
                     : null,
 
@@ -560,13 +568,23 @@ function PatientProfileSetup() {
         try {
             const payload = buildProfilePayload();
 
+            const token = authService.getAccessToken();
+
+            if (!token) {
+                throw new Error(
+                    'Your session has expired. Please log in again.',
+                );
+            }
+
             if (hasExistingProfile) {
                 await updatePatientProfile(
                     payload,
+                    token,
                 );
             } else {
                 await createPatientProfile(
                     payload,
+                    token,
                 );
 
                 setHasExistingProfile(true);
@@ -631,7 +649,7 @@ function PatientProfileSetup() {
                         {Math.round(
                             ((section + 1) /
                                 sections.length) *
-                                100,
+                            100,
                         )}
                         %
                     </div>
@@ -650,20 +668,18 @@ function PatientProfileSetup() {
                                 }
                             }}
                             disabled={index > section}
-                            className={`text-center text-[10px] font-bold transition ${
-                                index === section
-                                    ? 'text-(--sj-primary)'
-                                    : index < section
-                                      ? 'text-(--sj-text-soft)'
-                                      : 'text-(--sj-text-muted)'
-                            }`}
+                            className={`text-center text-[10px] font-bold transition ${index === section
+                                ? 'text-(--sj-primary)'
+                                : index < section
+                                    ? 'text-(--sj-text-soft)'
+                                    : 'text-(--sj-text-muted)'
+                                }`}
                         >
                             <span
-                                className={`mx-auto mb-1 block h-1.5 rounded-full ${
-                                    index <= section
-                                        ? 'bg-(--sj-primary)'
-                                        : 'bg-(--sj-border)'
-                                }`}
+                                className={`mx-auto mb-1 block h-1.5 rounded-full ${index <= section
+                                    ? 'bg-(--sj-primary)'
+                                    : 'bg-(--sj-border)'
+                                    }`}
                             />
 
                             {item.title}
@@ -1366,12 +1382,12 @@ function PatientProfileSetup() {
 
                                     <p className="mt-1 font-semibold text-(--sj-text)">
                                         {formData.pregnancyStatus ===
-                                        'pregnant'
+                                            'pregnant'
                                             ? 'Pregnant'
                                             : formData.pregnancyStatus ===
                                                 'not_pregnant'
-                                              ? 'Not pregnant'
-                                              : 'Not specified'}
+                                                ? 'Not pregnant'
+                                                : 'Not specified'}
                                     </p>
                                 </div>
                             )}
@@ -1479,12 +1495,12 @@ function PatientProfileSetup() {
                                 <p className="mt-1 font-semibold text-(--sj-text)">
                                     {shouldAskPregnancyStatus
                                         ? formData.pregnancyStatus ===
-                                          'pregnant'
+                                            'pregnant'
                                             ? 'Pregnant'
                                             : formData.pregnancyStatus ===
                                                 'not_pregnant'
-                                              ? 'Not pregnant'
-                                              : 'Not specified'
+                                                ? 'Not pregnant'
+                                                : 'Not specified'
                                         : 'Not applicable'}
                                 </p>
                             </div>

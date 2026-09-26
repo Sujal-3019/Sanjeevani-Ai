@@ -1,17 +1,23 @@
 import { api } from './api';
 
+const ACCESS_TOKEN_KEY =
+    'sanjeevani_access_token';
 
-const ACCESS_TOKEN_KEY = 'sanjeevani_access_token';
-const REFRESH_TOKEN_KEY = 'sanjeevani_refresh_token';
+const REFRESH_TOKEN_KEY =
+    'sanjeevani_refresh_token';
 
 
 function getAccessToken() {
-    return localStorage.getItem(ACCESS_TOKEN_KEY);
+    return localStorage.getItem(
+        ACCESS_TOKEN_KEY,
+    );
 }
 
 
 function getRefreshToken() {
-    return localStorage.getItem(REFRESH_TOKEN_KEY);
+    return localStorage.getItem(
+        REFRESH_TOKEN_KEY,
+    );
 }
 
 
@@ -33,9 +39,19 @@ function saveTokens(data) {
 
 
 function clearTokens() {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(
+        ACCESS_TOKEN_KEY,
+    );
+
+    localStorage.removeItem(
+        REFRESH_TOKEN_KEY,
+    );
 }
+
+
+// ------------------------------------------------------------------
+// Registration
+// ------------------------------------------------------------------
 
 
 async function registerPatient(data) {
@@ -70,14 +86,28 @@ async function verifyRegistrationOTP(
     identifier,
     otp,
 ) {
-    return api.post(
+    const data = await api.post(
         '/auth/register/verify-otp',
         {
             identifier,
             otp,
         },
     );
+
+    /*
+     * Registration OTP verification now returns access
+     * and refresh tokens. Save them immediately so the
+     * protected patient profile setup page can call APIs.
+     */
+    saveTokens(data);
+
+    return data;
 }
+
+
+// ------------------------------------------------------------------
+// Password login
+// ------------------------------------------------------------------
 
 
 async function loginWithPassword(
@@ -92,6 +122,11 @@ async function loginWithPassword(
         },
     );
 }
+
+
+// ------------------------------------------------------------------
+// Login OTP verification
+// ------------------------------------------------------------------
 
 
 async function verifyLoginOTP(
@@ -112,7 +147,14 @@ async function verifyLoginOTP(
 }
 
 
-async function sendParamedicOTP(mobileNumber) {
+// ------------------------------------------------------------------
+// Paramedic login
+// ------------------------------------------------------------------
+
+
+async function sendParamedicOTP(
+    mobileNumber,
+) {
     return api.post(
         '/auth/paramedic/otp/send',
         {
@@ -140,8 +182,14 @@ async function verifyParamedicOTP(
 }
 
 
+// ------------------------------------------------------------------
+// Current user
+// ------------------------------------------------------------------
+
+
 async function getCurrentUser() {
-    const accessToken = getAccessToken();
+    const accessToken =
+        getAccessToken();
 
     if (!accessToken) {
         return null;
@@ -156,8 +204,14 @@ async function getCurrentUser() {
 }
 
 
+// ------------------------------------------------------------------
+// Refresh token
+// ------------------------------------------------------------------
+
+
 async function refreshAccessToken() {
-    const refreshToken = getRefreshToken();
+    const refreshToken =
+        getRefreshToken();
 
     if (!refreshToken) {
         return null;
@@ -181,8 +235,14 @@ async function refreshAccessToken() {
 }
 
 
+// ------------------------------------------------------------------
+// Logout
+// ------------------------------------------------------------------
+
+
 async function logout() {
-    const refreshToken = getRefreshToken();
+    const refreshToken =
+        getRefreshToken();
 
     try {
         if (refreshToken) {

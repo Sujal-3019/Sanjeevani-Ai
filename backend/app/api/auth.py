@@ -65,7 +65,10 @@ def register_patient(
         )
 
         return OTPResponse(
-            message="Patient account created. OTP sent to your mobile number.",
+            message=(
+                "Patient account created. "
+                "OTP sent to your mobile number."
+            ),
             channel=otp.channel.value,
             destination=otp.destination,
         )
@@ -110,7 +113,10 @@ def register_hospital_admin(
         )
 
         return OTPResponse(
-            message="Hospital admin account created. OTP sent to your mobile number.",
+            message=(
+                "Hospital admin account created. "
+                "OTP sent to your mobile number."
+            ),
             channel=otp.channel.value,
             destination=otp.destination,
         )
@@ -135,7 +141,7 @@ def register_hospital_admin(
 
 @router.post(
     "/register/verify-otp",
-    response_model=MessageResponse,
+    response_model=TokenResponse,
 )
 def verify_registration_otp(
     request: VerifyOTPRequest,
@@ -151,20 +157,28 @@ def verify_registration_otp(
         )
 
         if otp_record.user_id is None:
-            raise InvalidOTPError("Invalid registration OTP.")
+            raise InvalidOTPError(
+                "Invalid registration OTP."
+            )
 
         user = db.get(User, otp_record.user_id)
 
         if user is None:
-            raise InvalidOTPError("Associated user account was not found.")
+            raise InvalidOTPError(
+                "Associated user account was not found."
+            )
 
         AuthService.mark_user_verified(
             db=db,
             user=user,
         )
 
-        return MessageResponse(
-            message="Account verified successfully.",
+        # Registration OTP verification completes the identity
+        # verification step. Create an authenticated session so the
+        # patient can immediately complete their protected profile.
+        return AuthService.create_login_tokens(
+            db=db,
+            user=user,
         )
 
     except InvalidOTPError as exc:
@@ -291,7 +305,9 @@ def verify_login_otp(
         )
 
         if otp_record.user_id is None:
-            raise InvalidOTPError("Invalid login OTP.")
+            raise InvalidOTPError(
+                "Invalid login OTP."
+            )
 
         user = db.get(User, otp_record.user_id)
 
@@ -430,7 +446,9 @@ def verify_paramedic_otp(
         )
 
         if otp_record.user_id != paramedic.id:
-            raise InvalidOTPError("Invalid OTP.")
+            raise InvalidOTPError(
+                "Invalid OTP."
+            )
 
         return AuthService.create_login_tokens(
             db=db,
@@ -523,6 +541,12 @@ def logout(
     return MessageResponse(
         message="Logged out successfully.",
     )
+
+
+# ------------------------------------------------------------------
+# Current user
+# ------------------------------------------------------------------
+
 
 @router.get(
     "/me",

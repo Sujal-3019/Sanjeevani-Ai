@@ -10,227 +10,339 @@ import {
 import authService from '../services/authService';
 
 
-const AuthContext = createContext(null);
+const AuthContext =
+    createContext(null);
 
 
-export function AuthProvider({ children }) {
-    const [user, setUser] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
+export function AuthProvider({
+    children,
+}) {
+    const [user, setUser] =
+        useState(null);
+
+    const [isLoading, setIsLoading] =
+        useState(true);
 
 
-    const isAuthenticated = Boolean(user);
+    const isAuthenticated =
+        Boolean(user);
 
 
-    const loadCurrentUser = useCallback(
-        async () => {
-            const accessToken =
-                authService.getAccessToken();
+    const loadCurrentUser =
+        useCallback(
+            async () => {
+                const accessToken =
+                    authService.getAccessToken();
 
-            if (!accessToken) {
-                setUser(null);
-                setIsLoading(false);
-                return null;
-            }
-
-            try {
-                const currentUser =
-                    await authService.getCurrentUser();
-
-                setUser(currentUser);
-
-                return currentUser;
-            } catch (error) {
-                console.warn(
-                    'Access token validation failed:',
-                    error,
-                );
-
-                try {
-                    const refreshData =
-                        await authService.refreshAccessToken();
-
-                    if (!refreshData?.access_token) {
-                        throw new Error(
-                            'Token refresh failed.',
-                        );
-                    }
-
-                    const refreshedUser =
-                        await authService.getCurrentUser();
-
-                    setUser(refreshedUser);
-
-                    return refreshedUser;
-                } catch (refreshError) {
-                    console.warn(
-                        'Session refresh failed:',
-                        refreshError,
-                    );
-
-                    authService.clearTokens();
+                if (!accessToken) {
                     setUser(null);
+                    setIsLoading(false);
 
                     return null;
                 }
-            } finally {
-                setIsLoading(false);
-            }
-        },
-        [],
-    );
+
+                try {
+                    const currentUser =
+                        await authService.getCurrentUser();
+
+                    setUser(currentUser);
+
+                    return currentUser;
+                } catch (error) {
+                    console.warn(
+                        'Access token validation failed:',
+                        error,
+                    );
+
+                    try {
+                        const refreshData =
+                            await authService.refreshAccessToken();
+
+                        if (
+                            !refreshData?.access_token
+                        ) {
+                            throw new Error(
+                                'Token refresh failed.',
+                            );
+                        }
+
+                        const refreshedUser =
+                            await authService.getCurrentUser();
+
+                        setUser(
+                            refreshedUser,
+                        );
+
+                        return refreshedUser;
+                    } catch (
+                        refreshError
+                    ) {
+                        console.warn(
+                            'Session refresh failed:',
+                            refreshError,
+                        );
+
+                        authService.clearTokens();
+
+                        setUser(null);
+
+                        return null;
+                    }
+                } finally {
+                    setIsLoading(false);
+                }
+            },
+            [],
+        );
 
 
     useEffect(() => {
         loadCurrentUser();
-    }, [loadCurrentUser]);
+    }, [
+        loadCurrentUser,
+    ]);
 
 
-    const loginWithPassword = useCallback(
-        async (identifier, password) => {
-            const response =
-                await authService.loginWithPassword(
-                    identifier,
-                    password,
-                );
-
-            return response;
-        },
-        [],
-    );
+    // ------------------------------------------------------------------
+    // Password login
+    // ------------------------------------------------------------------
 
 
-    const verifyLoginOTP = useCallback(
-        async (identifier, otp) => {
-            const tokenData =
-                await authService.verifyLoginOTP(
-                    identifier,
-                    otp,
-                );
+    const loginWithPassword =
+        useCallback(
+            async (
+                identifier,
+                password,
+            ) => {
+                const response =
+                    await authService.loginWithPassword(
+                        identifier,
+                        password,
+                    );
 
-            const currentUser =
-                await authService.getCurrentUser();
-
-            setUser(currentUser);
-
-            return {
-                ...tokenData,
-                user: currentUser,
-            };
-        },
-        [],
-    );
+                return response;
+            },
+            [],
+        );
 
 
-    const registerPatient = useCallback(
-        async (data) => {
-            return authService.registerPatient(data);
-        },
-        [],
-    );
+    // ------------------------------------------------------------------
+    // Login OTP verification
+    // ------------------------------------------------------------------
 
 
-    const registerHospitalAdmin = useCallback(
-        async (data) => {
-            return authService.registerHospitalAdmin(data);
-        },
-        [],
-    );
-
-
-    const verifyRegistrationOTP = useCallback(
-        async (identifier, otp) => {
-            return authService.verifyRegistrationOTP(
+    const verifyLoginOTP =
+        useCallback(
+            async (
                 identifier,
                 otp,
-            );
-        },
-        [],
-    );
+            ) => {
+                const tokenData =
+                    await authService.verifyLoginOTP(
+                        identifier,
+                        otp,
+                    );
 
+                const currentUser =
+                    await authService.getCurrentUser();
 
-    const loginParamedic = useCallback(
-        async (mobileNumber) => {
-            return authService.sendParamedicOTP(
-                mobileNumber,
-            );
-        },
-        [],
-    );
-
-
-    const verifyParamedicOTP = useCallback(
-        async (mobileNumber, otp) => {
-            const tokenData =
-                await authService.verifyParamedicOTP(
-                    mobileNumber,
-                    otp,
+                setUser(
+                    currentUser,
                 );
 
-            const currentUser =
-                await authService.getCurrentUser();
-
-            setUser(currentUser);
-
-            return {
-                ...tokenData,
-                user: currentUser,
-            };
-        },
-        [],
-    );
+                return {
+                    ...tokenData,
+                    user: currentUser,
+                };
+            },
+            [],
+        );
 
 
-    const logout = useCallback(
-        async () => {
-            try {
-                await authService.logout();
-            } finally {
-                setUser(null);
-            }
-        },
-        [],
-    );
+    // ------------------------------------------------------------------
+    // Patient registration
+    // ------------------------------------------------------------------
 
 
-    const value = useMemo(
-        () => ({
-            user,
-            isAuthenticated,
-            isLoading,
+    const registerPatient =
+        useCallback(
+            async (data) => {
+                return authService.registerPatient(
+                    data,
+                );
+            },
+            [],
+        );
 
-            loginWithPassword,
-            verifyLoginOTP,
 
-            registerPatient,
-            registerHospitalAdmin,
-            verifyRegistrationOTP,
+    // ------------------------------------------------------------------
+    // Hospital admin registration
+    // ------------------------------------------------------------------
 
-            loginParamedic,
-            verifyParamedicOTP,
 
-            logout,
+    const registerHospitalAdmin =
+        useCallback(
+            async (data) => {
+                return authService.registerHospitalAdmin(
+                    data,
+                );
+            },
+            [],
+        );
 
-            refreshUser: loadCurrentUser,
-        }),
-        [
-            user,
-            isAuthenticated,
-            isLoading,
-            loginWithPassword,
-            verifyLoginOTP,
-            registerPatient,
-            registerHospitalAdmin,
-            verifyRegistrationOTP,
-            loginParamedic,
-            verifyParamedicOTP,
-            logout,
-            loadCurrentUser,
-        ],
-    );
+
+    // ------------------------------------------------------------------
+    // Registration OTP verification
+    // ------------------------------------------------------------------
+
+
+    const verifyRegistrationOTP =
+        useCallback(
+            async (
+                identifier,
+                otp,
+            ) => {
+                /*
+                 * authService.verifyRegistrationOTP()
+                 * now saves the access + refresh tokens.
+                 */
+                const tokenData =
+                    await authService.verifyRegistrationOTP(
+                        identifier,
+                        otp,
+                    );
+
+                /*
+                 * Load the newly verified user using
+                 * the access token that was just saved.
+                 */
+                const currentUser =
+                    await authService.getCurrentUser();
+
+                setUser(
+                    currentUser,
+                );
+
+                return {
+                    ...tokenData,
+                    user: currentUser,
+                };
+            },
+            [],
+        );
+
+
+    // ------------------------------------------------------------------
+    // Paramedic authentication
+    // ------------------------------------------------------------------
+
+
+    const loginParamedic =
+        useCallback(
+            async (
+                mobileNumber,
+            ) => {
+                return authService.sendParamedicOTP(
+                    mobileNumber,
+                );
+            },
+            [],
+        );
+
+
+    const verifyParamedicOTP =
+        useCallback(
+            async (
+                mobileNumber,
+                otp,
+            ) => {
+                const tokenData =
+                    await authService.verifyParamedicOTP(
+                        mobileNumber,
+                        otp,
+                    );
+
+                const currentUser =
+                    await authService.getCurrentUser();
+
+                setUser(
+                    currentUser,
+                );
+
+                return {
+                    ...tokenData,
+                    user: currentUser,
+                };
+            },
+            [],
+        );
+
+
+    // ------------------------------------------------------------------
+    // Logout
+    // ------------------------------------------------------------------
+
+
+    const logout =
+        useCallback(
+            async () => {
+                try {
+                    await authService.logout();
+                } finally {
+                    setUser(null);
+                }
+            },
+            [],
+        );
+
+
+    const value =
+        useMemo(
+            () => ({
+                user,
+                isAuthenticated,
+                isLoading,
+
+                loginWithPassword,
+                verifyLoginOTP,
+
+                registerPatient,
+                registerHospitalAdmin,
+                verifyRegistrationOTP,
+
+                loginParamedic,
+                verifyParamedicOTP,
+
+                logout,
+
+                refreshUser:
+                    loadCurrentUser,
+            }),
+            [
+                user,
+                isAuthenticated,
+                isLoading,
+
+                loginWithPassword,
+                verifyLoginOTP,
+
+                registerPatient,
+                registerHospitalAdmin,
+                verifyRegistrationOTP,
+
+                loginParamedic,
+                verifyParamedicOTP,
+
+                logout,
+                loadCurrentUser,
+            ],
+        );
 
 
     return (
-        <AuthContext.Provider value={value}>
+        <AuthContext.Provider
+            value={value}
+        >
             {children}
         </AuthContext.Provider>
     );
@@ -238,7 +350,8 @@ export function AuthProvider({ children }) {
 
 
 export function useAuth() {
-    const context = useContext(AuthContext);
+    const context =
+        useContext(AuthContext);
 
     if (!context) {
         throw new Error(

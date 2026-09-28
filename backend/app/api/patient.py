@@ -14,7 +14,8 @@ from app.models.sos_request import SOSRequest
 from app.core.security import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.user import User, UserRole
-
+from app.models.sos_request import SOSRequestStatus
+from app.models.emergency_event import EmergencyEventStatus
 from app.schemas.patient_profile import (
     PatientProfileCreate,
     PatientProfileResponse,
@@ -277,6 +278,135 @@ def create_emergency_sos(
             detail=str(exc),
         ) from exc
 
+@router.get(
+    "/emergency-active",
+    status_code=status.HTTP_200_OK,
+)
+def get_active_emergency(
+    current_user: User = Depends(
+        patient_role_dependency,
+    ),
+    db: Session = Depends(get_db),
+):
+    result = db.execute(
+        select(
+            SOSRequest,
+            EmergencyEvent,
+            ST_Y(
+                cast(
+                    SOSRequest.location,
+                    Geometry,
+                ),
+            ).label("latitude"),
+            ST_X(
+                cast(
+                    SOSRequest.location,
+                    Geometry,
+                ),
+            ).label("longitude"),
+        )
+        .join(
+            PatientProfile,
+            PatientProfile.id
+            == SOSRequest.patient_profile_id,
+        )
+        .outerjoin(
+            EmergencyEvent,
+            EmergencyEvent.sos_request_id
+            == SOSRequest.id,
+        )
+        .where(
+            PatientProfile.user_id
+            == current_user.id,
+            SOSRequest.status
+            == SOSRequestStatus.CREATED,
+        )
+        .order_by(
+            SOSRequest.created_at.desc(),
+        )
+    ).first()
+
+    if result is None:
+        return None
+
+    (
+        sos_request,
+        emergency_event,
+        latitude,
+        longitude,
+    ) = result
+
+    # If an emergency event has already reached a terminal
+    # state, there is no active SOS to resume.
+    if (
+        emergency_event is not None
+        and emergency_event.status
+        in {
+            EmergencyEventStatus.COMPLETED,
+            EmergencyEventStatus.CANCELLED,
+        }
+    ):
+        return None
+
+    return {
+        "id": sos_request.id,
+        "emergency_event_id": (
+            emergency_event.id
+            if emergency_event is not None
+            else None
+        ),
+        "emergency_type": (
+            sos_request.emergency_type.value
+            if hasattr(
+                sos_request.emergency_type,
+                "value",
+            )
+            else str(
+                sos_request.emergency_type,
+            )
+        ),
+        "emergency_details": (
+            sos_request.emergency_details
+        ),
+        "sos_status": (
+            sos_request.status.value
+            if hasattr(
+                sos_request.status,
+                "value",
+            )
+            else str(
+                sos_request.status,
+            )
+        ),
+        "event_status": (
+            emergency_event.status.value
+            if (
+                emergency_event is not None
+                and hasattr(
+                    emergency_event.status,
+                    "value",
+                )
+            )
+            else (
+                str(emergency_event.status)
+                if emergency_event is not None
+                else None
+            )
+        ),
+        "created_at": sos_request.created_at,
+        "updated_at": sos_request.updated_at,
+        "latitude": (
+            float(latitude)
+            if latitude is not None
+            else None
+        ),
+        "longitude": (
+            float(longitude)
+            if longitude is not None
+            else None
+        ),
+    }
+
 
 @router.get(
     "/emergency/{sos_id}",
@@ -344,6 +474,84 @@ def get_emergency_sos(
         "emergency_details": sos_request.emergency_details,
         "latitude": float(latitude),
         "longitude": float(longitude),
+    }
+
+@router.post(
+    "/emergency/{sos_id}/close",
+    status_code=status.HTTP_200_OK,
+)
+def close_emergency(
+    sos_id: uuid.UUID,
+    current_user: User = Depends(
+        patient_role_dependency,
+    ),
+    db: Session = Depends(get_db),
+):
+    result = db.execute(
+        select(
+            SOSRequest,
+            EmergencyEvent,
+        )
+        .join(
+            PatientProfile,
+            PatientProfile.id
+            == SOSRequest.patient_profile_id,
+        )
+        .outerjoin(
+            EmergencyEvent,
+            EmergencyEvent.sos_request_id
+            == SOSRequest.id,
+        )
+        .where(
+            SOSRequest.id == sos_id,
+            PatientProfile.user_id
+            == current_user.id,
+        )
+    ).first()
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Emergency request not found.",
+        )
+
+    sos_request, emergency_event = result
+
+    if (
+        sos_request.status
+        == SOSRequestStatus.CANCELLED
+    ):
+        return {
+            "message": "Emergency request is already closed.",
+            "id": sos_request.id,
+            "status": sos_request.status.value,
+        }
+
+    if (
+        emergency_event is not None
+        and emergency_event.status
+        == EmergencyEventStatus.COMPLETED
+    ):
+        return {
+            "message": "Emergency request is already completed.",
+            "id": sos_request.id,
+            "status": "COMPLETED",
+        }
+
+    # Patient has confirmed that external help has been received.
+    sos_request.status = SOSRequestStatus.CANCELLED
+
+    if emergency_event is not None:
+        emergency_event.status = (
+            EmergencyEventStatus.CANCELLED
+        )
+
+    db.commit()
+
+    return {
+        "message": "Emergency request closed successfully.",
+        "id": sos_request.id,
+        "status": "CANCELLED",
     }
 
 

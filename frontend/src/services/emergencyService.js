@@ -25,6 +25,30 @@ export async function getEmergencySOS(
     );
 }
 
+export async function getActiveEmergency(
+    token,
+) {
+    return api.get(
+        '/patient/emergency-active',
+        {
+            token,
+        },
+    );
+}
+
+export async function closeEmergencySOS(
+    sosId,
+    token,
+) {
+    return api.post(
+        `/patient/emergency/${sosId}/close`,
+        {},
+        {
+            token,
+        },
+    );
+}
+
 export async function getEmergencyHistory(
     token,
 ) {
@@ -39,6 +63,8 @@ export async function getEmergencyHistory(
 export const emergencyService = {
     createSOS: createEmergencySOS,
     getSOS: getEmergencySOS,
+    getActiveEmergency,
+    closeSOS: closeEmergencySOS,
     getHistory: getEmergencyHistory,
 };
 

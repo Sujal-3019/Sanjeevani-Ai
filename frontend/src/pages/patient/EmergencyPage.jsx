@@ -183,7 +183,16 @@ function EmergencyPage() {
         isAuthenticated,
     } = useAuth();
 
-    const [step, setStep] = useState('confirm');
+    const [step, setStep] = useState('loading');
+
+    const [activeEmergency, setActiveEmergency] =
+        useState(null);
+
+    const [isLoadingEmergency, setIsLoadingEmergency] =
+        useState(true);
+
+    const [isClosingEmergency, setIsClosingEmergency] =
+        useState(false);
 
     const [
         showEmergencyModal,
@@ -233,6 +242,74 @@ function EmergencyPage() {
         ) {
             return;
         }
+
+        let isMounted = true;
+
+        async function loadActiveEmergency() {
+            try {
+                setIsLoadingEmergency(true);
+                setErrorMessage('');
+
+                const token =
+                    authService.getAccessToken();
+
+                if (!token) {
+                    throw new Error(
+                        'Your session has expired. Please log in again.',
+                    );
+                }
+
+                const emergency =
+                    await emergencyService.getActiveEmergency(
+                        token,
+                    );
+
+                if (!isMounted) {
+                    return;
+                }
+
+                if (emergency) {
+                    setActiveEmergency(emergency);
+                    setEmergencyResult(emergency);
+                    setCurrentLocation({
+                        latitude: emergency.latitude,
+                        longitude: emergency.longitude,
+                    });
+                    setStep('created');
+                } else {
+                    setActiveEmergency(null);
+                    setEmergencyResult(null);
+                    setStep('confirm');
+                }
+            } catch (error) {
+                if (!isMounted) {
+                    return;
+                }
+
+                console.error(
+                    'Failed to load active emergency:',
+                    error,
+                );
+
+                setErrorMessage(
+                    error?.data?.detail ||
+                    error?.message ||
+                    'We could not check your current emergency status.',
+                );
+
+                setStep('confirm');
+            } finally {
+                if (isMounted) {
+                    setIsLoadingEmergency(false);
+                }
+            }
+        }
+
+        loadActiveEmergency();
+
+        return () => {
+            isMounted = false;
+        };
     }, [
         authLoading,
         isAuthenticated,
@@ -331,10 +408,8 @@ function EmergencyPage() {
                             token,
                         );
 
-                    setEmergencyResult(
-                        response,
-                    );
-
+                    setEmergencyResult(response);
+                    setActiveEmergency(response);
                     setStep('created');
                 } catch (error) {
                     console.error(
@@ -362,6 +437,71 @@ function EmergencyPage() {
         );
 
 
+    const handleCloseEmergency =
+        useCallback(
+            async () => {
+                if (
+                    !activeEmergency?.id ||
+                    isClosingEmergency
+                ) {
+                    return;
+                }
+
+                const confirmed =
+                    window.confirm(
+                        'Have you received help from another source and no longer need this Sanjeevani SOS? The emergency request will be closed.',
+                    );
+
+                if (!confirmed) {
+                    return;
+                }
+
+                try {
+                    setIsClosingEmergency(true);
+                    setErrorMessage('');
+
+                    const token =
+                        authService.getAccessToken();
+
+                    if (!token) {
+                        throw new Error(
+                            'Your session has expired. Please log in again.',
+                        );
+                    }
+
+                    await emergencyService.closeSOS(
+                        activeEmergency.id,
+                        token,
+                    );
+
+                    setActiveEmergency(null);
+                    setEmergencyResult(null);
+                    setCurrentLocation(null);
+                    setLocationAccuracy(null);
+                    setSelectedEmergencyType('');
+                    setEmergencyDetails('');
+                    setStep('confirm');
+                } catch (error) {
+                    console.error(
+                        'Failed to close emergency:',
+                        error,
+                    );
+
+                    setErrorMessage(
+                        error?.data?.detail ||
+                        error?.message ||
+                        'We could not close the emergency request. Please try again.',
+                    );
+                } finally {
+                    setIsClosingEmergency(false);
+                }
+            },
+            [
+                activeEmergency,
+                isClosingEmergency,
+            ],
+        );
+
     const resetEmergency =
         useCallback(
             () => {
@@ -383,6 +523,23 @@ function EmergencyPage() {
             },
             [],
         );
+
+    if (
+        authLoading ||
+        isLoadingEmergency
+    ) {
+        return (
+            <div className="sanjeevani-page flex min-h-screen items-center justify-center p-6">
+                <div className="text-center">
+                    <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-(--sj-primary)/20 border-t-(--sj-primary)" />
+
+                    <p className="mt-4 text-sm font-semibold text-(--sj-text-soft)">
+                        Checking your emergency status...
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
 
     if (authLoading) {
@@ -435,143 +592,276 @@ function EmergencyPage() {
                 )}
 
 
-                {step === 'confirm' && (
-                    <section className="overflow-hidden rounded-3xl border border-(--sj-border) bg-(--sj-surface) shadow-sm">
-                        <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-                            <div className="p-6 sm:p-8 lg:p-10">
-                                <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600">
-                                    <Activity className="h-4 w-4" />
+                {step === 'confirm' &&
+                    !activeEmergency && (
+                        <section className="overflow-hidden rounded-3xl border border-(--sj-border) bg-(--sj-surface) shadow-sm">
+                            <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
+                                <div className="p-6 sm:p-8 lg:p-10">
+                                    <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600">
+                                        <Activity className="h-4 w-4" />
 
-                                    Emergency assistance
-                                </div>
-
-                                <h2 className="max-w-xl text-3xl font-bold tracking-tight text-(--sj-text) sm:text-4xl">
-                                    Need immediate medical help?
-                                </h2>
-
-                                <p className="mt-4 max-w-xl text-sm leading-6 text-(--sj-text-soft) sm:text-base">
-                                    Press SOS and tell us what happened. We'll use your current location and emergency information to create your emergency request.
-                                </p>
-
-                                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                                    <button
-                                        type="button"
-                                        onClick={
-                                            startEmergency
-                                        }
-                                        disabled={
-                                            isSubmitting
-                                        }
-                                        className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl bg-red-600 px-7 text-base font-bold text-white shadow-lg shadow-red-600/20 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        <ShieldAlert className="h-5 w-5" />
-
-                                        {isSubmitting
-                                            ? 'Processing...'
-                                            : 'SOS — I Need Help'}
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={
-                                            handleCallEmergency
-                                        }
-                                        className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl border border-(--sj-border) bg-(--sj-surface) px-7 text-base font-bold text-(--sj-text) transition hover:border-(--sj-primary)/30 hover:text-(--sj-primary)"
-                                    >
-                                        <Phone className="h-5 w-5" />
-
-                                        Call 112
-                                    </button>
-                                </div>
-
-                                <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                                    <div className="rounded-2xl bg-(--sj-background) p-4">
-                                        <LocateFixed className="h-5 w-5 text-(--sj-primary)" />
-
-                                        <p className="mt-3 text-sm font-bold text-(--sj-text)">
-                                            GPS location
-                                        </p>
-
-                                        <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
-                                            Your current location will be requested when you confirm SOS.
-                                        </p>
+                                        Emergency assistance
                                     </div>
 
-                                    <div className="rounded-2xl bg-(--sj-background) p-4">
-                                        <Sparkles className="h-5 w-5 text-(--sj-primary)" />
+                                    <h2 className="max-w-xl text-3xl font-bold tracking-tight text-(--sj-text) sm:text-4xl">
+                                        Need immediate medical help?
+                                    </h2>
 
-                                        <p className="mt-3 text-sm font-bold text-(--sj-text)">
-                                            Emergency details
-                                        </p>
+                                    <p className="mt-4 max-w-xl text-sm leading-6 text-(--sj-text-soft) sm:text-base">
+                                        Press SOS and tell us what happened. We'll use your current location and emergency information to create your emergency request.
+                                    </p>
 
-                                        <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
-                                            Tell us what happened so the emergency can be assessed.
-                                        </p>
+                                    <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                                        <button
+                                            type="button"
+                                            onClick={
+                                                startEmergency
+                                            }
+                                            disabled={
+                                                isSubmitting
+                                            }
+                                            className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl bg-red-600 px-7 text-base font-bold text-white shadow-lg shadow-red-600/20 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            <ShieldAlert className="h-5 w-5" />
+
+                                            {isSubmitting
+                                                ? 'Processing...'
+                                                : 'SOS — I Need Help'}
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={
+                                                handleCallEmergency
+                                            }
+                                            className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl border border-(--sj-border) bg-(--sj-surface) px-7 text-base font-bold text-(--sj-text) transition hover:border-(--sj-primary)/30 hover:text-(--sj-primary)"
+                                        >
+                                            <Phone className="h-5 w-5" />
+
+                                            Call 112
+                                        </button>
                                     </div>
 
-                                    <div className="rounded-2xl bg-(--sj-background) p-4">
-                                        <ShieldAlert className="h-5 w-5 text-(--sj-primary)" />
+                                    <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                                        <div className="rounded-2xl bg-(--sj-background) p-4">
+                                            <LocateFixed className="h-5 w-5 text-(--sj-primary)" />
 
-                                        <p className="mt-3 text-sm font-bold text-(--sj-text)">
-                                            Secure request
-                                        </p>
+                                            <p className="mt-3 text-sm font-bold text-(--sj-text)">
+                                                GPS location
+                                            </p>
 
-                                        <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
-                                            Your request is linked to your authenticated account.
-                                        </p>
+                                            <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
+                                                Your current location will be requested when you confirm SOS.
+                                            </p>
+                                        </div>
+
+                                        <div className="rounded-2xl bg-(--sj-background) p-4">
+                                            <Sparkles className="h-5 w-5 text-(--sj-primary)" />
+
+                                            <p className="mt-3 text-sm font-bold text-(--sj-text)">
+                                                Emergency details
+                                            </p>
+
+                                            <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
+                                                Tell us what happened so the emergency can be assessed.
+                                            </p>
+                                        </div>
+
+                                        <div className="rounded-2xl bg-(--sj-background) p-4">
+                                            <ShieldAlert className="h-5 w-5 text-(--sj-primary)" />
+
+                                            <p className="mt-3 text-sm font-bold text-(--sj-text)">
+                                                Secure request
+                                            </p>
+
+                                            <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
+                                                Your request is linked to your authenticated account.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-(--sj-border) bg-(--sj-background) p-6 sm:p-8 lg:border-l lg:border-t-0 lg:p-10">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-(--sj-primary)/10 text-(--sj-primary)">
+                                            <ShieldAlert className="h-5 w-5" />
+                                        </div>
+
+                                        <div>
+                                            <p className="text-sm font-bold text-(--sj-text)">
+                                                When to use SOS
+                                            </p>
+
+                                            <p className="text-xs text-(--sj-text-soft)">
+                                                For serious or potentially life-threatening emergencies.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-6 space-y-3">
+                                        {[
+                                            'Severe chest pain',
+                                            'Difficulty breathing',
+                                            'Unconsciousness',
+                                            'Severe bleeding',
+                                            'Serious accident',
+                                            'Suspected stroke',
+                                        ].map(
+                                            (item) => (
+                                                <div
+                                                    key={
+                                                        item
+                                                    }
+                                                    className="flex items-center gap-3 rounded-xl border border-(--sj-border) bg-(--sj-surface) px-4 py-3"
+                                                >
+                                                    <CheckCircle2 className="h-4 w-4 shrink-0 text-(--sj-primary)" />
+
+                                                    <span className="text-sm font-medium text-(--sj-text)">
+                                                        {item}
+                                                    </span>
+                                                </div>
+                                            ),
+                                        )}
                                     </div>
                                 </div>
                             </div>
+                        </section>
+                    )}
 
-                            <div className="border-t border-(--sj-border) bg-(--sj-background) p-6 sm:p-8 lg:border-l lg:border-t-0 lg:p-10">
-                                <div className="flex items-center gap-3">
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-(--sj-primary)/10 text-(--sj-primary)">
-                                        <ShieldAlert className="h-5 w-5" />
-                                    </div>
+                {activeEmergency && (
+                    <section className="overflow-hidden rounded-3xl border border-red-200 bg-(--sj-surface) shadow-sm">
+                        <div className="border-b border-red-100 bg-red-50 p-6 sm:p-8">
+                            <div className="flex items-start gap-4">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+                                    <ShieldAlert className="h-6 w-6" />
+                                </div>
+
+                                <div>
+                                    <p className="text-sm font-bold text-red-600">
+                                        Active emergency
+                                    </p>
+
+                                    <h2 className="mt-1 text-2xl font-bold text-(--sj-text)">
+                                        Your SOS request is active
+                                    </h2>
+
+                                    <p className="mt-2 max-w-2xl text-sm leading-6 text-(--sj-text-soft)">
+                                        This emergency request is already active.
+                                        You do not need to raise another SOS.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 sm:p-8">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="rounded-2xl bg-(--sj-background) p-4">
+                                    <p className="text-xs font-medium text-(--sj-text-soft)">
+                                        Emergency type
+                                    </p>
+
+                                    <p className="mt-1 text-sm font-bold text-(--sj-text)">
+                                        {activeEmergency.emergency_type}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-2xl bg-(--sj-background) p-4">
+                                    <p className="text-xs font-medium text-(--sj-text-soft)">
+                                        Emergency status
+                                    </p>
+
+                                    <p className="mt-1 text-sm font-bold text-red-600">
+                                        {activeEmergency.event_status ||
+                                            activeEmergency.sos_status}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-2xl bg-(--sj-background) p-4">
+                                    <p className="text-xs font-medium text-(--sj-text-soft)">
+                                        Emergency ID
+                                    </p>
+
+                                    <p className="mt-1 break-all font-mono text-xs text-(--sj-text)">
+                                        {activeEmergency.id}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-2xl bg-(--sj-background) p-4">
+                                    <p className="text-xs font-medium text-(--sj-text-soft)">
+                                        Location
+                                    </p>
+
+                                    <p className="mt-1 text-sm font-bold text-(--sj-text)">
+                                        GPS location captured
+                                    </p>
+                                </div>
+                            </div>
+
+                            {activeEmergency.emergency_details && (
+                                <div className="mt-4 rounded-2xl border border-(--sj-border) bg-(--sj-background) p-4">
+                                    <p className="text-xs font-medium text-(--sj-text-soft)">
+                                        Emergency details
+                                    </p>
+
+                                    <p className="mt-1 text-sm leading-6 text-(--sj-text)">
+                                        {activeEmergency.emergency_details}
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="mt-6 rounded-2xl border border-(--sj-primary)/20 bg-(--sj-primary)/5 p-4">
+                                <div className="flex items-start gap-3">
+                                    <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-(--sj-primary)" />
 
                                     <div>
                                         <p className="text-sm font-bold text-(--sj-text)">
-                                            When to use SOS
+                                            Emergency request is being tracked
                                         </p>
 
-                                        <p className="text-xs text-(--sj-text-soft)">
-                                            For serious or potentially life-threatening emergencies.
+                                        <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
+                                            You can leave this page and return later.
+                                            Your SOS remains active until it is completed
+                                            or you close it.
                                         </p>
                                     </div>
                                 </div>
-
-                                <div className="mt-6 space-y-3">
-                                    {[
-                                        'Severe chest pain',
-                                        'Difficulty breathing',
-                                        'Unconsciousness',
-                                        'Severe bleeding',
-                                        'Serious accident',
-                                        'Suspected stroke',
-                                    ].map(
-                                        (item) => (
-                                            <div
-                                                key={
-                                                    item
-                                                }
-                                                className="flex items-center gap-3 rounded-xl border border-(--sj-border) bg-(--sj-surface) px-4 py-3"
-                                            >
-                                                <CheckCircle2 className="h-4 w-4 shrink-0 text-(--sj-primary)" />
-
-                                                <span className="text-sm font-medium text-(--sj-text)">
-                                                    {item}
-                                                </span>
-                                            </div>
-                                        ),
-                                    )}
-                                </div>
                             </div>
+
+                            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                                <Link
+                                    to={`/dashboard/patient/tracking?emergency_id=${activeEmergency.id}`}
+                                    className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-(--sj-primary) px-5 text-sm font-bold text-white transition hover:opacity-90"
+                                >
+                                    <MapPin className="h-4 w-4" />
+
+                                    Open emergency tracking
+                                </Link>
+
+                                <button
+                                    type="button"
+                                    onClick={handleCloseEmergency}
+                                    disabled={isClosingEmergency}
+                                    className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    <CheckCircle2 className="h-4 w-4" />
+
+                                    {isClosingEmergency
+                                        ? 'Closing SOS...'
+                                        : 'External help received — Close SOS'}
+                                </button>
+                            </div>
+
+                            <p className="mt-4 text-center text-xs leading-5 text-(--sj-text-soft)">
+                                Only close this SOS if you have actually received
+                                help from another source or no longer require
+                                emergency assistance.
+                            </p>
                         </div>
                     </section>
                 )}
 
 
-                {step !== 'confirm' && (
+                {step !== 'confirm' && !activeEmergency && (
                     <section className="rounded-3xl border border-(--sj-border) bg-(--sj-surface) p-6 shadow-sm sm:p-8">
                         <div className="flex items-start gap-4">
                             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-(--sj-primary)/10 text-(--sj-primary)">
@@ -646,13 +936,13 @@ function EmergencyPage() {
                                                 flowStep.id
                                             }
                                             className={`flex items-center gap-4 rounded-2xl border p-4 ${isActive
-                                                    ? 'border-(--sj-primary)/30 bg-(--sj-primary)/5'
-                                                    : 'border-(--sj-border) bg-(--sj-background)'
+                                                ? 'border-(--sj-primary)/30 bg-(--sj-primary)/5'
+                                                : 'border-(--sj-border) bg-(--sj-background)'
                                                 }`}
                                         >
                                             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isCompleted
-                                                    ? 'bg-(--sj-primary)/10 text-(--sj-primary)'
-                                                    : 'bg-(--sj-surface) text-(--sj-text-soft)'
+                                                ? 'bg-(--sj-primary)/10 text-(--sj-primary)'
+                                                : 'bg-(--sj-surface) text-(--sj-text-soft)'
                                                 }`}>
                                                 {isActive &&
                                                     step !==
@@ -845,14 +1135,14 @@ function EmergencyPage() {
                                                     )
                                                 }
                                                 className={`rounded-2xl border p-4 text-left transition ${isSelected
-                                                        ? 'border-(--sj-primary) bg-(--sj-primary)/5 ring-2 ring-(--sj-primary)/10'
-                                                        : 'border-(--sj-border) bg-(--sj-background) hover:border-(--sj-primary)/30'
+                                                    ? 'border-(--sj-primary) bg-(--sj-primary)/5 ring-2 ring-(--sj-primary)/10'
+                                                    : 'border-(--sj-border) bg-(--sj-background) hover:border-(--sj-primary)/30'
                                                     }`}
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <div className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 ${isSelected
-                                                            ? 'border-(--sj-primary) bg-(--sj-primary)'
-                                                            : 'border-(--sj-text-soft)'
+                                                        ? 'border-(--sj-primary) bg-(--sj-primary)'
+                                                        : 'border-(--sj-text-soft)'
                                                         }`} />
 
                                                     <div>

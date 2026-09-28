@@ -25,9 +25,21 @@ export async function getEmergencySOS(
     );
 }
 
+export async function getEmergencyHistory(
+    token,
+) {
+    return api.get(
+        '/patient/emergency-history',
+        {
+            token,
+        },
+    );
+}
+
 export const emergencyService = {
     createSOS: createEmergencySOS,
     getSOS: getEmergencySOS,
+    getHistory: getEmergencyHistory,
 };
 
 export default emergencyService;

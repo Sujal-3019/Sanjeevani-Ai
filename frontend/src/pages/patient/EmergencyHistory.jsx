@@ -1,100 +1,201 @@
 import React from 'react';
 import {
-    ArrowLeft,
     Ambulance,
     CalendarDays,
     Clock3,
     FileText,
     Hospital,
     MapPin,
+    RefreshCw,
     ShieldCheck,
     X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
 import PatientNavbar from '../../components/layout/PatientNavbar';
+import authService from '../../services/authService';
+import emergencyService from '../../services/emergencyService';
 
-const emergencyHistory = [
-    {
-        id: 'EM-2026-00124',
-        date: '18 Aug 2026',
-        time: '10:18 AM',
-        type: 'Medical assistance',
-        severity: 'High priority',
-        hospital: 'Sanjeevani Emergency Hospital',
-        location: 'New Delhi, Delhi',
-        status: 'Completed',
-        ambulance: 'AMB-031',
-    },
-    {
-        id: 'EM-2026-00098',
-        date: '02 Jul 2026',
-        time: '04:42 PM',
-        type: 'Emergency consultation',
-        severity: 'Medium priority',
-        hospital: 'City Care Hospital',
-        location: 'New Delhi, Delhi',
-        status: 'Completed',
-        ambulance: 'AMB-018',
-    },
-    {
-        id: 'EM-2026-00051',
-        date: '11 May 2026',
-        time: '08:05 AM',
-        type: 'Medical assistance',
-        severity: 'Low priority',
-        hospital: 'Metro Health Centre',
-        location: 'New Delhi, Delhi',
-        status: 'Completed',
-        ambulance: 'Not dispatched',
-    },
-];
+function formatEmergencyType(type) {
+    if (!type) {
+        return 'Emergency assistance';
+    }
 
-function getSeverityClass(severity) {
-    if (severity === 'High priority') {
+    return type
+        .toString()
+        .toLowerCase()
+        .split('_')
+        .map(
+            (word) =>
+                word.charAt(0).toUpperCase() +
+                word.slice(1),
+        )
+        .join(' ');
+}
+
+function formatStatus(status) {
+    if (!status) {
+        return 'Unknown';
+    }
+
+    return status
+        .toString()
+        .toLowerCase()
+        .split('_')
+        .map(
+            (word) =>
+                word.charAt(0).toUpperCase() +
+                word.slice(1),
+        )
+        .join(' ');
+}
+
+function formatDate(dateValue) {
+    if (!dateValue) {
+        return 'Unknown date';
+    }
+
+    const date = new Date(dateValue);
+
+    if (Number.isNaN(date.getTime())) {
+        return 'Unknown date';
+    }
+
+    return new Intl.DateTimeFormat(
+        'en-IN',
+        {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        },
+    ).format(date);
+}
+
+function formatTime(dateValue) {
+    if (!dateValue) {
+        return 'Unknown time';
+    }
+
+    const date = new Date(dateValue);
+
+    if (Number.isNaN(date.getTime())) {
+        return 'Unknown time';
+    }
+
+    return new Intl.DateTimeFormat(
+        'en-IN',
+        {
+            hour: '2-digit',
+            minute: '2-digit',
+        },
+    ).format(date);
+}
+
+function getStatusClass(status) {
+    if (
+        status === 'COMPLETED' ||
+        status === 'ARRIVED_AT_HOSPITAL'
+    ) {
+        return 'sj-status-success';
+    }
+
+    if (
+        status === 'CANCELLED'
+    ) {
         return 'sj-status-danger';
     }
 
-    if (severity === 'Medium priority') {
-        return 'sj-status-warning';
+    if (
+        status === 'CREATED' ||
+        status === 'ASSESSING'
+    ) {
+        return 'sj-status-info';
     }
 
-    return 'sj-status-info';
+    return 'sj-status-warning';
 }
 
-function getSeverityDot(severity) {
-    if (severity === 'High priority') {
+function getStatusDot(status) {
+    if (
+        status === 'COMPLETED' ||
+        status === 'ARRIVED_AT_HOSPITAL'
+    ) {
+        return 'bg-emerald-500';
+    }
+
+    if (
+        status === 'CANCELLED'
+    ) {
         return 'bg-red-500';
     }
 
-    if (severity === 'Medium priority') {
-        return 'bg-amber-500';
+    if (
+        status === 'CREATED' ||
+        status === 'ASSESSING'
+    ) {
+        return 'bg-blue-500';
     }
 
-    return 'bg-blue-500';
+    return 'bg-amber-500';
 }
 
-function EmergencyDetailsModal({ emergency, onClose }) {
+function formatLocation(emergency) {
+    if (
+        emergency.latitude === null ||
+        emergency.latitude === undefined ||
+        emergency.longitude === null ||
+        emergency.longitude === undefined
+    ) {
+        return 'Location unavailable';
+    }
+
+    return `${Number(emergency.latitude).toFixed(
+        5,
+    )}, ${Number(emergency.longitude).toFixed(
+        5,
+    )}`;
+}
+
+function getDisplayStatus(emergency) {
+    return (
+        emergency.event_status ||
+        emergency.sos_status ||
+        'UNKNOWN'
+    );
+}
+
+function EmergencyDetailsModal({
+    emergency,
+    onClose,
+}) {
     if (!emergency) {
         return null;
     }
+
+    const status = getDisplayStatus(
+        emergency,
+    );
 
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm"
             onMouseDown={(event) => {
-                if (event.target === event.currentTarget) {
+                if (
+                    event.target ===
+                    event.currentTarget
+                ) {
                     onClose();
                 }
             }}
         >
             <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-(--sj-border) bg-(--sj-surface) shadow-2xl">
                 <div className="sticky top-0 flex items-center justify-between border-b border-(--sj-border) bg-(--sj-surface) px-5 py-4 sm:px-6">
-                    <div>
+                    <div className="min-w-0">
                         <p className="text-xs font-black uppercase tracking-[0.15em] text-(--sj-primary)">
                             Emergency details
                         </p>
 
-                        <h2 className="mt-1 text-lg font-black text-(--sj-text)">
+                        <h2 className="mt-1 truncate text-lg font-black text-(--sj-text)">
                             {emergency.id}
                         </h2>
                     </div>
@@ -103,7 +204,7 @@ function EmergencyDetailsModal({ emergency, onClose }) {
                         type="button"
                         onClick={onClose}
                         aria-label="Close details"
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-(--sj-border) text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-text)"
+                        className="ml-4 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-(--sj-border) text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-text)"
                     >
                         <X className="h-4 w-4" />
                     </button>
@@ -111,17 +212,18 @@ function EmergencyDetailsModal({ emergency, onClose }) {
 
                 <div className="space-y-5 p-5 sm:p-6">
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="sj-status sj-status-success">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                            {emergency.status}
-                        </span>
-
                         <span
-                            className={`sj-status ${getSeverityClass(
-                                emergency.severity,
+                            className={`sj-status ${getStatusClass(
+                                status,
                             )}`}
                         >
-                            {emergency.severity}
+                            <span
+                                className={`h-1.5 w-1.5 rounded-full ${getStatusDot(
+                                    status,
+                                )}`}
+                            />
+
+                            {formatStatus(status)}
                         </span>
                     </div>
 
@@ -129,52 +231,64 @@ function EmergencyDetailsModal({ emergency, onClose }) {
                         <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) p-4">
                             <div className="flex items-center gap-2 text-(--sj-text-muted)">
                                 <CalendarDays className="h-4 w-4" />
+
                                 <span className="text-xs font-bold uppercase tracking-wide">
                                     Date
                                 </span>
                             </div>
 
                             <p className="mt-2 text-sm font-bold text-(--sj-text)">
-                                {emergency.date}
+                                {formatDate(
+                                    emergency.created_at,
+                                )}
                             </p>
                         </div>
 
                         <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) p-4">
                             <div className="flex items-center gap-2 text-(--sj-text-muted)">
                                 <Clock3 className="h-4 w-4" />
+
                                 <span className="text-xs font-bold uppercase tracking-wide">
                                     Time
                                 </span>
                             </div>
 
                             <p className="mt-2 text-sm font-bold text-(--sj-text)">
-                                {emergency.time}
+                                {formatTime(
+                                    emergency.created_at,
+                                )}
                             </p>
                         </div>
 
                         <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) p-4">
                             <div className="flex items-center gap-2 text-(--sj-text-muted)">
                                 <FileText className="h-4 w-4" />
+
                                 <span className="text-xs font-bold uppercase tracking-wide">
                                     Emergency type
                                 </span>
                             </div>
 
                             <p className="mt-2 text-sm font-bold text-(--sj-text)">
-                                {emergency.type}
+                                {formatEmergencyType(
+                                    emergency.emergency_type,
+                                )}
                             </p>
                         </div>
 
                         <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) p-4">
                             <div className="flex items-center gap-2 text-(--sj-text-muted)">
                                 <MapPin className="h-4 w-4" />
+
                                 <span className="text-xs font-bold uppercase tracking-wide">
                                     Location
                                 </span>
                             </div>
 
-                            <p className="mt-2 text-sm font-bold text-(--sj-text)">
-                                {emergency.location}
+                            <p className="mt-2 break-all text-sm font-bold text-(--sj-text)">
+                                {formatLocation(
+                                    emergency,
+                                )}
                             </p>
                         </div>
                     </div>
@@ -187,11 +301,21 @@ function EmergencyDetailsModal({ emergency, onClose }) {
 
                             <div className="min-w-0">
                                 <p className="text-xs font-bold uppercase tracking-wide text-(--sj-text-muted)">
-                                    Hospital
+                                    Coordination
                                 </p>
 
-                                <p className="mt-1 text-sm font-black text-(--sj-text)">
-                                    {emergency.hospital}
+                                <p className="mt-1 text-sm font-bold text-(--sj-text)">
+                                    {formatStatus(
+                                        status,
+                                    )}
+                                </p>
+
+                                <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
+                                    Hospital and ambulance
+                                    assignment details will
+                                    appear here when those
+                                    coordination records are
+                                    connected.
                                 </p>
                             </div>
                         </div>
@@ -205,24 +329,41 @@ function EmergencyDetailsModal({ emergency, onClose }) {
 
                             <div className="min-w-0">
                                 <p className="text-xs font-bold uppercase tracking-wide text-(--sj-text-muted)">
-                                    Ambulance
+                                    Emergency event
                                 </p>
 
-                                <p className="mt-1 text-sm font-black text-(--sj-text)">
-                                    {emergency.ambulance}
+                                <p className="mt-1 break-all text-sm font-black text-(--sj-text)">
+                                    {emergency.emergency_event_id ||
+                                        'Not created'}
                                 </p>
                             </div>
                         </div>
                     </div>
+
+                    {emergency.emergency_details && (
+                        <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) p-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-(--sj-text-muted)">
+                                Emergency details
+                            </p>
+
+                            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-(--sj-text)">
+                                {
+                                    emergency.emergency_details
+                                }
+                            </p>
+                        </div>
+                    )}
 
                     <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) p-4">
                         <div className="flex items-start gap-3">
                             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-(--sj-primary)" />
 
                             <p className="text-xs leading-5 text-(--sj-text-soft)">
-                                This is a demonstration history record. Detailed
-                                medical records will be connected to the backend
-                                after the frontend workflow is finalized.
+                                This emergency record belongs
+                                to your authenticated patient
+                                account. The backend restricts
+                                history access using your
+                                authenticated user identity.
                             </p>
                         </div>
                     </div>
@@ -233,15 +374,91 @@ function EmergencyDetailsModal({ emergency, onClose }) {
 }
 
 function EmergencyHistory() {
-    const [selectedEmergency, setSelectedEmergency] = React.useState(null);
+    const [
+        emergencies,
+        setEmergencies,
+    ] = React.useState([]);
 
-    const totalEmergencies = emergencyHistory.length;
+    const [
+        isLoading,
+        setIsLoading,
+    ] = React.useState(true);
 
-    const completedEmergencies = emergencyHistory.filter(
-        (emergency) => emergency.status === 'Completed',
-    ).length;
+    const [
+        error,
+        setError,
+    ] = React.useState('');
 
-    const lastEmergency = emergencyHistory[0]?.date || 'No records';
+    const [
+        selectedEmergency,
+        setSelectedEmergency,
+    ] = React.useState(null);
+
+    const loadHistory = React.useCallback(
+        async () => {
+            setIsLoading(true);
+            setError('');
+
+            try {
+                const token =
+                    authService.getAccessToken();
+
+                if (!token) {
+                    throw new Error(
+                        'Your session has expired. Please log in again.',
+                    );
+                }
+
+                const data =
+                    await emergencyService.getHistory(
+                        token,
+                    );
+
+                setEmergencies(
+                    Array.isArray(data)
+                        ? data
+                        : [],
+                );
+            } catch (requestError) {
+                console.error(
+                    'Failed to load emergency history:',
+                    requestError,
+                );
+
+                setEmergencies([]);
+
+                setError(
+                    requestError?.data?.detail ||
+                        requestError?.message ||
+                        'Unable to load your emergency history.',
+                );
+            } finally {
+                setIsLoading(false);
+            }
+        },
+        [],
+    );
+
+    React.useEffect(() => {
+        loadHistory();
+    }, [loadHistory]);
+
+    const totalEmergencies =
+        emergencies.length;
+
+    const completedEmergencies =
+        emergencies.filter(
+            (emergency) =>
+                emergency.event_status ===
+                'COMPLETED',
+        ).length;
+
+    const lastEmergency =
+        emergencies[0]?.created_at
+            ? formatDate(
+                  emergencies[0].created_at,
+              )
+            : 'No records';
 
     return (
         <div className="sanjeevani-page min-h-screen">
@@ -260,9 +477,9 @@ function EmergencyHistory() {
                             </h1>
 
                             <p className="mt-3 max-w-2xl text-sm leading-6 text-(--sj-text-soft) sm:text-base">
-                                Review your previous emergency coordination
-                                requests, ambulance assignments, and receiving
-                                hospitals.
+                                Review your previous emergency
+                                coordination requests and
+                                emergency event status.
                             </p>
                         </div>
 
@@ -275,6 +492,34 @@ function EmergencyHistory() {
                     </div>
                 </section>
 
+                {error && (
+                    <section className="mb-8 rounded-2xl border border-red-500/20 bg-red-500/5 p-5">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p className="text-sm font-black text-(--sj-text)">
+                                    Unable to load emergency
+                                    history
+                                </p>
+
+                                <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
+                                    {error}
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={loadHistory}
+                                disabled={isLoading}
+                                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-(--sj-border) px-4 py-2.5 text-xs font-bold text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-text) disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <RefreshCw className="h-4 w-4" />
+
+                                Try again
+                            </button>
+                        </div>
+                    </section>
+                )}
+
                 <section className="mb-8 grid gap-4 sm:grid-cols-3">
                     <div className="sj-card p-5">
                         <p className="text-xs font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
@@ -282,7 +527,9 @@ function EmergencyHistory() {
                         </p>
 
                         <p className="mt-2 text-3xl font-black tracking-tight text-(--sj-text)">
-                            {totalEmergencies}
+                            {isLoading
+                                ? '—'
+                                : totalEmergencies}
                         </p>
 
                         <p className="mt-1 text-xs text-(--sj-text-soft)">
@@ -296,11 +543,13 @@ function EmergencyHistory() {
                         </p>
 
                         <p className="mt-2 text-3xl font-black tracking-tight text-(--sj-text)">
-                            {completedEmergencies}
+                            {isLoading
+                                ? '—'
+                                : completedEmergencies}
                         </p>
 
                         <p className="mt-1 text-xs text-(--sj-text-soft)">
-                            Successfully coordinated
+                            Emergency events completed
                         </p>
                     </div>
 
@@ -310,7 +559,9 @@ function EmergencyHistory() {
                         </p>
 
                         <p className="mt-2 text-xl font-black tracking-tight text-(--sj-text)">
-                            {lastEmergency}
+                            {isLoading
+                                ? '—'
+                                : lastEmergency}
                         </p>
 
                         <p className="mt-1 text-xs text-(--sj-text-soft)">
@@ -328,233 +579,333 @@ function EmergencyHistory() {
                                 </h2>
 
                                 <p className="mt-1 text-sm text-(--sj-text-soft)">
-                                    Your emergency coordination timeline.
+                                    Your emergency coordination
+                                    timeline.
                                 </p>
                             </div>
 
-                            <div className="hidden rounded-xl bg-(--sj-surface-2) px-3 py-2 text-xs font-bold text-(--sj-text-soft) sm:block">
-                                {totalEmergencies} records
-                            </div>
+                            {!isLoading && (
+                                <div className="hidden rounded-xl bg-(--sj-surface-2) px-3 py-2 text-xs font-bold text-(--sj-text-soft) sm:block">
+                                    {totalEmergencies}{' '}
+                                    {totalEmergencies === 1
+                                        ? 'record'
+                                        : 'records'}
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    <div className="hidden overflow-x-auto md:block">
-                        <table className="w-full min-w-212.5">
-                            <thead>
-                                <tr className="border-b border-(--sj-border) bg-(--sj-surface-2)">
-                                    <th className="px-6 py-4 text-left text-[11px] font-black uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                                        Emergency
-                                    </th>
+                    {isLoading && (
+                        <div className="flex min-h-60 items-center justify-center p-8">
+                            <div className="text-center">
+                                <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-(--sj-primary)/20 border-t-(--sj-primary)" />
 
-                                    <th className="px-6 py-4 text-left text-[11px] font-black uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                                        Date & time
-                                    </th>
+                                <p className="mt-4 text-sm font-semibold text-(--sj-text-soft)">
+                                    Loading your emergency
+                                    history...
+                                </p>
+                            </div>
+                        </div>
+                    )}
 
-                                    <th className="px-6 py-4 text-left text-[11px] font-black uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                                        Priority
-                                    </th>
-
-                                    <th className="px-6 py-4 text-left text-[11px] font-black uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                                        Hospital
-                                    </th>
-
-                                    <th className="px-6 py-4 text-left text-[11px] font-black uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                                        Status
-                                    </th>
-
-                                    <th className="px-6 py-4 text-right text-[11px] font-black uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                                        Action
-                                    </th>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                {emergencyHistory.map((emergency) => (
-                                    <tr
-                                        key={emergency.id}
-                                        className="border-b border-(--sj-border) last:border-b-0"
-                                    >
-                                        <td className="px-6 py-5">
-                                            <div>
-                                                <p className="text-sm font-black text-(--sj-text)">
-                                                    {emergency.id}
-                                                </p>
-
-                                                <p className="mt-1 text-xs text-(--sj-text-soft)">
-                                                    {emergency.type}
-                                                </p>
-                                            </div>
-                                        </td>
-
-                                        <td className="px-6 py-5">
-                                            <p className="text-sm font-bold text-(--sj-text)">
-                                                {emergency.date}
-                                            </p>
-
-                                            <p className="mt-1 text-xs text-(--sj-text-soft)">
-                                                {emergency.time}
-                                            </p>
-                                        </td>
-
-                                        <td className="px-6 py-5">
-                                            <span
-                                                className={`sj-status ${getSeverityClass(
-                                                    emergency.severity,
-                                                )}`}
-                                            >
-                                                <span
-                                                    className={`h-1.5 w-1.5 rounded-full ${getSeverityDot(
-                                                        emergency.severity,
-                                                    )}`}
-                                                />
-                                                {emergency.severity}
-                                            </span>
-                                        </td>
-
-                                        <td className="max-w-55 px-6 py-5">
-                                            <p className="truncate text-sm font-bold text-(--sj-text)">
-                                                {emergency.hospital}
-                                            </p>
-
-                                            <p className="mt-1 truncate text-xs text-(--sj-text-soft)">
-                                                {emergency.location}
-                                            </p>
-                                        </td>
-
-                                        <td className="px-6 py-5">
-                                            <span className="sj-status sj-status-success">
-                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                                {emergency.status}
-                                            </span>
-                                        </td>
-
-                                        <td className="px-6 py-5 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setSelectedEmergency(
-                                                        emergency,
-                                                    )
-                                                }
-                                                className="rounded-lg border border-(--sj-border) px-3 py-2 text-xs font-bold text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-text)"
-                                            >
-                                                View details
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div className="divide-y divide-(--sj-border) md:hidden">
-                        {emergencyHistory.map((emergency) => (
-                            <article
-                                key={emergency.id}
-                                className="p-5"
-                            >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-black text-(--sj-text)">
-                                            {emergency.id}
-                                        </p>
-
-                                        <p className="mt-1 text-xs text-(--sj-text-soft)">
-                                            {emergency.type}
-                                        </p>
+                    {!isLoading &&
+                        !error &&
+                        emergencies.length === 0 && (
+                            <div className="flex min-h-60 items-center justify-center p-8">
+                                <div className="max-w-md text-center">
+                                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-(--sj-primary)/10 text-(--sj-primary)">
+                                        <ShieldCheck className="h-6 w-6" />
                                     </div>
 
-                                    <span className="sj-status sj-status-success shrink-0">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                        Completed
-                                    </span>
+                                    <h3 className="mt-4 text-lg font-black text-(--sj-text)">
+                                        No emergency records yet
+                                    </h3>
+
+                                    <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
+                                        Your previous SOS requests
+                                        will appear here after an
+                                        emergency is created.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                    {!isLoading &&
+                        emergencies.length > 0 && (
+                            <>
+                                <div className="hidden overflow-x-auto md:block">
+                                    <table className="w-full min-w-212.5">
+                                        <thead>
+                                            <tr className="border-b border-(--sj-border) bg-(--sj-surface-2)">
+                                                <th className="px-6 py-4 text-left text-[11px] font-black uppercase tracking-[0.12em] text-(--sj-text-muted)">
+                                                    Emergency
+                                                </th>
+
+                                                <th className="px-6 py-4 text-left text-[11px] font-black uppercase tracking-[0.12em] text-(--sj-text-muted)">
+                                                    Date & time
+                                                </th>
+
+                                                <th className="px-6 py-4 text-left text-[11px] font-black uppercase tracking-[0.12em] text-(--sj-text-muted)">
+                                                    Type
+                                                </th>
+
+                                                <th className="px-6 py-4 text-left text-[11px] font-black uppercase tracking-[0.12em] text-(--sj-text-muted)">
+                                                    Status
+                                                </th>
+
+                                                <th className="px-6 py-4 text-left text-[11px] font-black uppercase tracking-[0.12em] text-(--sj-text-muted)">
+                                                    Location
+                                                </th>
+
+                                                <th className="px-6 py-4 text-right text-[11px] font-black uppercase tracking-[0.12em] text-(--sj-text-muted)">
+                                                    Action
+                                                </th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody>
+                                            {emergencies.map(
+                                                (
+                                                    emergency,
+                                                ) => {
+                                                    const status =
+                                                        getDisplayStatus(
+                                                            emergency,
+                                                        );
+
+                                                    return (
+                                                        <tr
+                                                            key={String(
+                                                                emergency.id,
+                                                            )}
+                                                            className="border-b border-(--sj-border) last:border-b-0"
+                                                        >
+                                                            <td className="px-6 py-5">
+                                                                <div>
+                                                                    <p className="break-all text-sm font-black text-(--sj-text)">
+                                                                        {String(
+                                                                            emergency.id,
+                                                                        )}
+                                                                    </p>
+
+                                                                    <p className="mt-1 text-xs text-(--sj-text-soft)">
+                                                                        {formatEmergencyType(
+                                                                            emergency.emergency_type,
+                                                                        )}
+                                                                    </p>
+                                                                </div>
+                                                            </td>
+
+                                                            <td className="px-6 py-5">
+                                                                <p className="text-sm font-bold text-(--sj-text)">
+                                                                    {formatDate(
+                                                                        emergency.created_at,
+                                                                    )}
+                                                                </p>
+
+                                                                <p className="mt-1 text-xs text-(--sj-text-soft)">
+                                                                    {formatTime(
+                                                                        emergency.created_at,
+                                                                    )}
+                                                                </p>
+                                                            </td>
+
+                                                            <td className="px-6 py-5">
+                                                                <span className="sj-status sj-status-info">
+                                                                    {formatEmergencyType(
+                                                                        emergency.emergency_type,
+                                                                    )}
+                                                                </span>
+                                                            </td>
+
+                                                            <td className="px-6 py-5">
+                                                                <span
+                                                                    className={`sj-status ${getStatusClass(
+                                                                        status,
+                                                                    )}`}
+                                                                >
+                                                                    <span
+                                                                        className={`h-1.5 w-1.5 rounded-full ${getStatusDot(
+                                                                            status,
+                                                                        )}`}
+                                                                    />
+
+                                                                    {formatStatus(
+                                                                        status,
+                                                                    )}
+                                                                </span>
+                                                            </td>
+
+                                                            <td className="max-w-55 px-6 py-5">
+                                                                <p className="truncate text-sm font-bold text-(--sj-text)">
+                                                                    {formatLocation(
+                                                                        emergency,
+                                                                    )}
+                                                                </p>
+
+                                                                {emergency.emergency_details && (
+                                                                    <p className="mt-1 truncate text-xs text-(--sj-text-soft)">
+                                                                        {
+                                                                            emergency.emergency_details
+                                                                        }
+                                                                    </p>
+                                                                )}
+                                                            </td>
+
+                                                            <td className="px-6 py-5 text-right">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        setSelectedEmergency(
+                                                                            emergency,
+                                                                        )
+                                                                    }
+                                                                    className="rounded-lg border border-(--sj-border) px-3 py-2 text-xs font-bold text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-text)"
+                                                                >
+                                                                    View details
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                },
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
 
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    <span
-                                        className={`sj-status ${getSeverityClass(
-                                            emergency.severity,
-                                        )}`}
-                                    >
-                                        <span
-                                            className={`h-1.5 w-1.5 rounded-full ${getSeverityDot(
-                                                emergency.severity,
-                                            )}`}
-                                        />
-                                        {emergency.severity}
-                                    </span>
+                                <div className="divide-y divide-(--sj-border) md:hidden">
+                                    {emergencies.map(
+                                        (
+                                            emergency,
+                                        ) => {
+                                            const status =
+                                                getDisplayStatus(
+                                                    emergency,
+                                                );
+
+                                            return (
+                                                <article
+                                                    key={String(
+                                                        emergency.id,
+                                                    )}
+                                                    className="p-5"
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <p className="break-all text-sm font-black text-(--sj-text)">
+                                                                {String(
+                                                                    emergency.id,
+                                                                )}
+                                                            </p>
+
+                                                            <p className="mt-1 text-xs text-(--sj-text-soft)">
+                                                                {formatEmergencyType(
+                                                                    emergency.emergency_type,
+                                                                )}
+                                                            </p>
+                                                        </div>
+
+                                                        <span
+                                                            className={`sj-status shrink-0 ${getStatusClass(
+                                                                status,
+                                                            )}`}
+                                                        >
+                                                            <span
+                                                                className={`h-1.5 w-1.5 rounded-full ${getStatusDot(
+                                                                    status,
+                                                                )}`}
+                                                            />
+
+                                                            {formatStatus(
+                                                                status,
+                                                            )}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="mt-4">
+                                                        <span className="sj-status sj-status-info">
+                                                            {formatEmergencyType(
+                                                                emergency.emergency_type,
+                                                            )}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="mt-4 grid gap-3">
+                                                        <div className="flex items-start gap-3">
+                                                            <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-(--sj-text-muted)" />
+
+                                                            <div>
+                                                                <p className="text-xs font-bold text-(--sj-text-muted)">
+                                                                    Date
+                                                                    &
+                                                                    time
+                                                                </p>
+
+                                                                <p className="mt-1 text-sm font-semibold text-(--sj-text)">
+                                                                    {formatDate(
+                                                                        emergency.created_at,
+                                                                    )}{' '}
+                                                                    ·{' '}
+                                                                    {formatTime(
+                                                                        emergency.created_at,
+                                                                    )}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-start gap-3">
+                                                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-(--sj-text-muted)" />
+
+                                                            <div>
+                                                                <p className="text-xs font-bold text-(--sj-text-muted)">
+                                                                    Location
+                                                                </p>
+
+                                                                <p className="mt-1 break-all text-sm font-semibold text-(--sj-text)">
+                                                                    {formatLocation(
+                                                                        emergency,
+                                                                    )}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        {emergency.emergency_details && (
+                                                            <div className="flex items-start gap-3">
+                                                                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-(--sj-text-muted)" />
+
+                                                                <div>
+                                                                    <p className="text-xs font-bold text-(--sj-text-muted)">
+                                                                        Details
+                                                                    </p>
+
+                                                                    <p className="mt-1 text-sm font-semibold text-(--sj-text)">
+                                                                        {
+                                                                            emergency.emergency_details
+                                                                        }
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setSelectedEmergency(
+                                                                emergency,
+                                                            )
+                                                        }
+                                                        className="mt-5 w-full rounded-xl border border-(--sj-border) px-4 py-3 text-sm font-bold text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-text)"
+                                                    >
+                                                        View details
+                                                    </button>
+                                                </article>
+                                            );
+                                        },
+                                    )}
                                 </div>
-
-                                <div className="mt-4 grid gap-3">
-                                    <div className="flex items-start gap-3">
-                                        <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-(--sj-text-muted)" />
-
-                                        <div>
-                                            <p className="text-xs font-bold text-(--sj-text-muted)">
-                                                Date & time
-                                            </p>
-
-                                            <p className="mt-1 text-sm font-semibold text-(--sj-text)">
-                                                {emergency.date} · {emergency.time}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-start gap-3">
-                                        <Hospital className="mt-0.5 h-4 w-4 shrink-0 text-(--sj-text-muted)" />
-
-                                        <div>
-                                            <p className="text-xs font-bold text-(--sj-text-muted)">
-                                                Hospital
-                                            </p>
-
-                                            <p className="mt-1 text-sm font-semibold text-(--sj-text)">
-                                                {emergency.hospital}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-start gap-3">
-                                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-(--sj-text-muted)" />
-
-                                        <div>
-                                            <p className="text-xs font-bold text-(--sj-text-muted)">
-                                                Location
-                                            </p>
-
-                                            <p className="mt-1 text-sm font-semibold text-(--sj-text)">
-                                                {emergency.location}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-start gap-3">
-                                        <Ambulance className="mt-0.5 h-4 w-4 shrink-0 text-(--sj-text-muted)" />
-
-                                        <div>
-                                            <p className="text-xs font-bold text-(--sj-text-muted)">
-                                                Ambulance
-                                            </p>
-
-                                            <p className="mt-1 text-sm font-semibold text-(--sj-text)">
-                                                {emergency.ambulance}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setSelectedEmergency(emergency)
-                                    }
-                                    className="mt-5 w-full rounded-xl border border-(--sj-border) px-4 py-3 text-sm font-bold text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-text)"
-                                >
-                                    View details
-                                </button>
-                            </article>
-                        ))}
-                    </div>
+                            </>
+                        )}
                 </section>
 
                 <section className="mt-6 rounded-2xl border border-(--sj-border) bg-(--sj-surface) p-5 sm:p-6">
@@ -569,10 +920,11 @@ function EmergencyHistory() {
                             </h2>
 
                             <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
-                                Emergency history is intended for authorized
-                                patient and emergency-care workflows. Backend
-                                access controls will be applied during
-                                integration.
+                                History is retrieved from the
+                                authenticated patient's account.
+                                The backend uses the logged-in
+                                user's identity rather than accepting
+                                a patient ID from the frontend.
                             </p>
                         </div>
                     </div>
@@ -581,8 +933,14 @@ function EmergencyHistory() {
 
             {selectedEmergency && (
                 <EmergencyDetailsModal
-                    emergency={selectedEmergency}
-                    onClose={() => setSelectedEmergency(null)}
+                    emergency={
+                        selectedEmergency
+                    }
+                    onClose={() =>
+                        setSelectedEmergency(
+                            null,
+                        )
+                    }
                 />
             )}
         </div>

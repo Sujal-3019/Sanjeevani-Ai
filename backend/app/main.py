@@ -5,7 +5,7 @@ from sqlalchemy import text
 from app.api.router import router as api_router
 from app.core.config import settings
 from app.db.session import engine
-
+from app.api.emergency_share import router as emergency_share_router
 
 app = FastAPI(
     title=settings.app_name,
@@ -29,26 +29,14 @@ app.include_router(
     prefix="/api",
 )
 
+app.include_router(
+    emergency_share_router,
+    prefix="/api",
+)
 
 @app.get("/")
 def root():
     return {
         "message": "Welcome to Sanjeevani AI API",
         "version": "1.0.0",
-    }
-
-
-@app.get("/api/database-test")
-def database_test():
-    with engine.connect() as connection:
-        result = connection.execute(
-            text("SELECT current_database(), version()")
-        )
-
-        database_name, database_version = result.fetchone()
-
-    return {
-        "status": "connected",
-        "database": database_name,
-        "postgresql": database_version,
     }

@@ -1,17 +1,17 @@
 import enum
 import uuid
-
-from geoalchemy2 import Geometry
-from geoalchemy2.functions import ST_X, ST_Y
+from geoalchemy2 import Geometry , Geography
+from geoalchemy2.functions import ST_X, ST_Y ,ST_MakePoint, ST_SetSRID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import cast, select
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 
 from app.models.patient_profile import PatientProfile
 from app.models.emergency_event import EmergencyEvent
 from app.models.sos_request import SOSRequest
 
-from app.core.security import get_current_user, require_roles
+from app.core.security import require_roles
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.models.sos_request import SOSRequestStatus
@@ -19,6 +19,14 @@ from app.models.emergency_event import EmergencyEventStatus
 from app.schemas.patient_profile import (
     PatientProfileCreate,
     PatientProfileResponse,
+)
+from app.services.emergency_share_service import (
+    EmergencyShareService,
+)
+from app.models.patient_location import PatientLocationUpdate
+from app.schemas.patient_location import (
+    PatientLocationUpdateCreate,
+    PatientLocationUpdateResponse,
 )
 
 from app.services.patient_profile_service import (
@@ -248,7 +256,7 @@ def create_emergency_sos(
     db: Session = Depends(get_db),
 ):
     try:
-        sos_request, emergency_event = (
+        sos_request, emergency_event, _share_token = (
             SOSService.create_sos(
                 db=db,
                 user=current_user,
@@ -477,6 +485,91 @@ def get_emergency_sos(
     }
 
 @router.post(
+    "/emergency/{sos_id}/location",
+    response_model=PatientLocationUpdateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def update_emergency_location(
+    sos_id: uuid.UUID,
+    data: PatientLocationUpdateCreate,
+    current_user: User = Depends(
+        patient_role_dependency,
+    ),
+    db: Session = Depends(get_db),
+):
+    sos_request = db.scalar(
+        select(SOSRequest)
+        .join(
+            PatientProfile,
+            PatientProfile.id
+            == SOSRequest.patient_profile_id,
+        )
+        .where(
+            SOSRequest.id == sos_id,
+            PatientProfile.user_id == current_user.id,
+            SOSRequest.status == SOSRequestStatus.CREATED,
+        )
+    )
+
+    if sos_request is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Active emergency request not found.",
+        )
+
+    emergency_event = db.scalar(
+        select(EmergencyEvent).where(
+            EmergencyEvent.sos_request_id
+            == sos_request.id,
+        )
+    )
+
+    if emergency_event is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Emergency event not found.",
+        )
+
+    if emergency_event.status in {
+        EmergencyEventStatus.COMPLETED,
+        EmergencyEventStatus.CANCELLED,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This emergency is no longer active.",
+        )
+
+    location = ST_SetSRID(
+        ST_MakePoint(
+            data.longitude,
+            data.latitude,
+        ),
+        4326,
+    )
+
+    location_update = PatientLocationUpdate(
+        sos_request_id=sos_request.id,
+        location=location,
+    )
+
+    db.add(location_update)
+    db.commit()
+    db.refresh(location_update)
+
+    recorded_at = (
+        location_update.recorded_at
+        or datetime.now(timezone.utc)
+    )
+
+    return {
+        "sos_request_id": str(sos_request.id),
+        "latitude": data.latitude,
+        "longitude": data.longitude,
+        "recorded_at": recorded_at.isoformat(),
+    }
+
+
+@router.post(
     "/emergency/{sos_id}/close",
     status_code=status.HTTP_200_OK,
 )
@@ -545,6 +638,11 @@ def close_emergency(
         emergency_event.status = (
             EmergencyEventStatus.CANCELLED
         )
+
+    EmergencyShareService.revoke_share_token(
+        db=db,
+        sos_request_id=sos_request.id,
+    )
 
     db.commit()
 

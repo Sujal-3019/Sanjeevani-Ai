@@ -45,6 +45,7 @@ import Navigation from './pages/paramedic/Navigation';
 import MissionHistory from './pages/paramedic/MissionHistory';
 import ParamedicProfile from './pages/paramedic/ParamedicProfile';
 
+import EmergencyShare from './pages/EmergencyShare';
 
 function AuthPlaceholder({ title, description }) {
     return (
@@ -101,6 +102,11 @@ export default function App() {
                     <Route
                         path="/"
                         element={<HomePage />}
+                    />
+
+                    <Route
+                        path="/emergency-share/:token"
+                        element={<EmergencyShare />}
                     />
 
                     {/* =====================================================

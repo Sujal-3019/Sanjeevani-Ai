@@ -1,6 +1,7 @@
-from uuid import UUID
-
-from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
+from geoalchemy2.functions import (
+    ST_MakePoint,
+    ST_SetSRID,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,13 @@ from app.models.sos_request import (
 )
 from app.models.user import User, UserRole
 from app.schemas.sos_request import SOSRequestCreate
+from app.services.emergency_share_service import (
+    EmergencyShareService,
+)
+from app.services.emergency_notification_service import (
+    EmergencyNotificationService,
+)
+
 
 
 class SOSServiceError(Exception):
@@ -36,7 +44,7 @@ class SOSService:
         db: Session,
         user: User,
         data: SOSRequestCreate,
-    ) -> tuple[SOSRequest, EmergencyEvent]:
+    ) -> tuple[SOSRequest, EmergencyEvent, str]:
 
         if user.role != UserRole.PATIENT:
             raise InvalidSOSRequestError(
@@ -84,9 +92,31 @@ class SOSService:
         )
 
         db.add(emergency_event)
+        db.flush()
+
+        share_token = (
+            EmergencyShareService.create_share_token(
+                db=db,
+                sos_request=sos_request,
+            )
+        )
+
+        # Commit SOS, emergency event, and share token
+        # together as one database transaction.
         db.commit()
 
         db.refresh(sos_request)
         db.refresh(emergency_event)
 
-        return sos_request, emergency_event
+        EmergencyNotificationService.notify_primary_contact(
+            patient_profile=patient_profile,
+            patient_user=user,
+            sos_request=sos_request,
+            share_token=share_token,
+        )
+
+        return (
+            sos_request,
+            emergency_event,
+            share_token,
+        )

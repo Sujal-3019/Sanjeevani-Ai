@@ -1,5 +1,6 @@
 import { api } from './api.js';
 
+
 export async function createEmergencySOS(
     payload,
     token,
@@ -7,11 +8,10 @@ export async function createEmergencySOS(
     return api.post(
         '/patient/emergency/sos',
         payload,
-        {
-            token,
-        },
+        { token },
     );
 }
+
 
 export async function getEmergencySOS(
     sosId,
@@ -19,22 +19,30 @@ export async function getEmergencySOS(
 ) {
     return api.get(
         `/patient/emergency/${sosId}`,
-        {
-            token,
-        },
+        { token },
     );
 }
+
+
+export async function getEmergencyHistory(
+    token,
+) {
+    return api.get(
+        '/patient/emergency-history',
+        { token },
+    );
+}
+
 
 export async function getActiveEmergency(
     token,
 ) {
     return api.get(
         '/patient/emergency-active',
-        {
-            token,
-        },
+        { token },
     );
 }
+
 
 export async function closeEmergencySOS(
     sosId,
@@ -43,29 +51,32 @@ export async function closeEmergencySOS(
     return api.post(
         `/patient/emergency/${sosId}/close`,
         {},
-        {
-            token,
-        },
+        { token },
     );
 }
 
-export async function getEmergencyHistory(
+
+export async function updateEmergencyLocation(
+    sosId,
+    payload,
     token,
 ) {
-    return api.get(
-        '/patient/emergency-history',
-        {
-            token,
-        },
+    return api.post(
+        `/patient/emergency/${sosId}/location`,
+        payload,
+        { token },
     );
 }
+
 
 export const emergencyService = {
     createSOS: createEmergencySOS,
     getSOS: getEmergencySOS,
+    getHistory: getEmergencyHistory,
     getActiveEmergency,
     closeSOS: closeEmergencySOS,
-    getHistory: getEmergencyHistory,
+    updateLocation: updateEmergencyLocation,
 };
+
 
 export default emergencyService;

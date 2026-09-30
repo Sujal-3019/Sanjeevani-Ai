@@ -1,6 +1,7 @@
 import React, {
     useCallback,
     useEffect,
+    useRef,
     useState,
 } from 'react';
 import {
@@ -108,6 +109,9 @@ const FLOW_STEPS = [
 ];
 
 
+const LOCATION_UPDATE_INTERVAL = 10000;
+
+
 function getLocation() {
     return new Promise(
         (resolve, reject) => {
@@ -183,6 +187,7 @@ function EmergencyPage() {
         isAuthenticated,
     } = useAuth();
 
+
     const [step, setStep] = useState('loading');
 
     const [activeEmergency, setActiveEmergency] =
@@ -235,6 +240,16 @@ function EmergencyPage() {
     ] = useState(null);
 
 
+    const locationWatcherRef =
+        useRef(null);
+
+    const lastLocationSentAtRef =
+        useRef(0);
+
+    const isSendingLocationRef =
+        useRef(false);
+
+
     useEffect(() => {
         if (
             authLoading ||
@@ -269,12 +284,21 @@ function EmergencyPage() {
                 }
 
                 if (emergency) {
-                    setActiveEmergency(emergency);
-                    setEmergencyResult(emergency);
+                    setActiveEmergency(
+                        emergency,
+                    );
+
+                    setEmergencyResult(
+                        emergency,
+                    );
+
                     setCurrentLocation({
-                        latitude: emergency.latitude,
-                        longitude: emergency.longitude,
+                        latitude:
+                            emergency.latitude,
+                        longitude:
+                            emergency.longitude,
                     });
+
                     setStep('created');
                 } else {
                     setActiveEmergency(null);
@@ -300,7 +324,9 @@ function EmergencyPage() {
                 setStep('confirm');
             } finally {
                 if (isMounted) {
-                    setIsLoadingEmergency(false);
+                    setIsLoadingEmergency(
+                        false,
+                    );
                 }
             }
         }
@@ -316,13 +342,200 @@ function EmergencyPage() {
     ]);
 
 
-    const startEmergency = useCallback(
-        () => {
-            setErrorMessage('');
-            setShowEmergencyModal(true);
-        },
-        [],
-    );
+    /*
+     * Continuously track the patient's location
+     * while an emergency is active.
+     *
+     * Browser GPS updates can happen much more frequently
+     * than we need to store them, so backend updates are
+     * throttled to one request every 10 seconds.
+     */
+    useEffect(() => {
+        if (
+            !activeEmergency?.id
+        ) {
+            return undefined;
+        }
+
+        if (
+            !navigator.geolocation
+        ) {
+            console.warn(
+                'Browser geolocation is not available.',
+            );
+
+            return undefined;
+        }
+
+        let isMounted = true;
+
+        const sosId =
+            activeEmergency.id;
+
+
+        async function sendLocation(
+            position,
+        ) {
+            if (!isMounted) {
+                return;
+            }
+
+            const now =
+                Date.now();
+
+            if (
+                now -
+                    lastLocationSentAtRef.current <
+                LOCATION_UPDATE_INTERVAL
+            ) {
+                return;
+            }
+
+            if (
+                isSendingLocationRef.current
+            ) {
+                return;
+            }
+
+            const latitude =
+                position.coords.latitude;
+
+            const longitude =
+                position.coords.longitude;
+
+            const accuracy =
+                position.coords.accuracy;
+
+
+            isSendingLocationRef.current =
+                true;
+
+
+            setCurrentLocation({
+                latitude,
+                longitude,
+            });
+
+            if (
+                Number.isFinite(
+                    accuracy,
+                )
+            ) {
+                setLocationAccuracy(
+                    accuracy,
+                );
+            }
+
+
+            try {
+                const token =
+                    authService.getAccessToken();
+
+                if (!token) {
+                    console.warn(
+                        'Cannot update emergency location: access token is missing.',
+                    );
+
+                    return;
+                }
+
+                await emergencyService.updateLocation(
+                    sosId,
+                    {
+                        latitude,
+                        longitude,
+                    },
+                    token,
+                );
+
+                lastLocationSentAtRef.current =
+                    Date.now();
+            } catch (error) {
+                /*
+                 * Location tracking failure must not
+                 * break the emergency UI.
+                 *
+                 * The next GPS update will try again.
+                 */
+                console.warn(
+                    'Emergency location update failed:',
+                    error,
+                );
+            } finally {
+                isSendingLocationRef.current =
+                    false;
+            }
+        }
+
+
+        function handleLocationError(
+            error,
+        ) {
+            /*
+             * Do not show location watcher errors
+             * as a blocking SOS error.
+             *
+             * The emergency remains active even if
+             * a particular GPS update fails.
+             */
+            console.warn(
+                'Emergency GPS tracking error:',
+                error,
+            );
+        }
+
+
+        /*
+         * Allow the first watcher position to be sent
+         * immediately.
+         */
+        lastLocationSentAtRef.current = 0;
+
+
+        locationWatcherRef.current =
+            navigator.geolocation.watchPosition(
+                sendLocation,
+                handleLocationError,
+                {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 5000,
+                },
+            );
+
+
+        return () => {
+            isMounted = false;
+
+            if (
+                locationWatcherRef.current !== null
+            ) {
+                navigator.geolocation.clearWatch(
+                    locationWatcherRef.current,
+                );
+
+                locationWatcherRef.current =
+                    null;
+            }
+
+            isSendingLocationRef.current =
+                false;
+        };
+    }, [
+        activeEmergency?.id,
+    ]);
+
+
+    const startEmergency =
+        useCallback(
+            () => {
+                setErrorMessage('');
+                setShowEmergencyModal(
+                    true,
+                );
+            },
+            [],
+        );
 
 
     const handleEmergencyTypeSelect =
@@ -331,6 +544,7 @@ function EmergencyPage() {
                 setSelectedEmergencyType(
                     value,
                 );
+
                 setErrorMessage('');
             },
             [],
@@ -362,7 +576,9 @@ function EmergencyPage() {
 
                 setErrorMessage('');
                 setIsSubmitting(true);
-                setShowEmergencyModal(false);
+                setShowEmergencyModal(
+                    false,
+                );
 
                 try {
                     setStep('locating');
@@ -408,8 +624,14 @@ function EmergencyPage() {
                             token,
                         );
 
-                    setEmergencyResult(response);
-                    setActiveEmergency(response);
+                    setEmergencyResult(
+                        response,
+                    );
+
+                    setActiveEmergency(
+                        response,
+                    );
+
                     setStep('created');
                 } catch (error) {
                     console.error(
@@ -423,6 +645,7 @@ function EmergencyPage() {
                     );
 
                     setStep('confirm');
+
                     setShowEmergencyModal(
                         true,
                     );
@@ -457,7 +680,10 @@ function EmergencyPage() {
                 }
 
                 try {
-                    setIsClosingEmergency(true);
+                    setIsClosingEmergency(
+                        true,
+                    );
+
                     setErrorMessage('');
 
                     const token =
@@ -474,12 +700,30 @@ function EmergencyPage() {
                         token,
                     );
 
-                    setActiveEmergency(null);
-                    setEmergencyResult(null);
-                    setCurrentLocation(null);
-                    setLocationAccuracy(null);
-                    setSelectedEmergencyType('');
-                    setEmergencyDetails('');
+                    setActiveEmergency(
+                        null,
+                    );
+
+                    setEmergencyResult(
+                        null,
+                    );
+
+                    setCurrentLocation(
+                        null,
+                    );
+
+                    setLocationAccuracy(
+                        null,
+                    );
+
+                    setSelectedEmergencyType(
+                        '',
+                    );
+
+                    setEmergencyDetails(
+                        '',
+                    );
+
                     setStep('confirm');
                 } catch (error) {
                     console.error(
@@ -493,7 +737,9 @@ function EmergencyPage() {
                         'We could not close the emergency request. Please try again.',
                     );
                 } finally {
-                    setIsClosingEmergency(false);
+                    setIsClosingEmergency(
+                        false,
+                    );
                 }
             },
             [
@@ -502,27 +748,41 @@ function EmergencyPage() {
             ],
         );
 
+
     const resetEmergency =
         useCallback(
             () => {
                 setStep('confirm');
 
-                setShowEmergencyModal(false);
+                setShowEmergencyModal(
+                    false,
+                );
 
-                setSelectedEmergencyType('');
+                setSelectedEmergencyType(
+                    '',
+                );
 
-                setEmergencyDetails('');
+                setEmergencyDetails(
+                    '',
+                );
 
-                setCurrentLocation(null);
+                setCurrentLocation(
+                    null,
+                );
 
-                setLocationAccuracy(null);
+                setLocationAccuracy(
+                    null,
+                );
 
-                setEmergencyResult(null);
+                setEmergencyResult(
+                    null,
+                );
 
                 setErrorMessage('');
             },
             [],
         );
+
 
     if (
         authLoading ||
@@ -568,9 +828,7 @@ function EmergencyPage() {
                         className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-(--sj-border) bg-(--sj-surface) text-(--sj-text-soft) transition hover:border-(--sj-primary)/30 hover:text-(--sj-primary)"
                         aria-label="Back to patient dashboard"
                     >
-                        <ArrowLeft
-                            className="h-5 w-5"
-                        />
+                        <ArrowLeft className="h-5 w-5" />
                     </Link>
 
                     <div>
@@ -614,12 +872,8 @@ function EmergencyPage() {
                                     <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                                         <button
                                             type="button"
-                                            onClick={
-                                                startEmergency
-                                            }
-                                            disabled={
-                                                isSubmitting
-                                            }
+                                            onClick={startEmergency}
+                                            disabled={isSubmitting}
                                             className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl bg-red-600 px-7 text-base font-bold text-white shadow-lg shadow-red-600/20 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                             <ShieldAlert className="h-5 w-5" />
@@ -631,9 +885,7 @@ function EmergencyPage() {
 
                                         <button
                                             type="button"
-                                            onClick={
-                                                handleCallEmergency
-                                            }
+                                            onClick={handleCallEmergency}
                                             className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl border border-(--sj-border) bg-(--sj-surface) px-7 text-base font-bold text-(--sj-text) transition hover:border-(--sj-primary)/30 hover:text-(--sj-primary)"
                                         >
                                             <Phone className="h-5 w-5" />
@@ -709,9 +961,7 @@ function EmergencyPage() {
                                         ].map(
                                             (item) => (
                                                 <div
-                                                    key={
-                                                        item
-                                                    }
+                                                    key={item}
                                                     className="flex items-center gap-3 rounded-xl border border-(--sj-border) bg-(--sj-surface) px-4 py-3"
                                                 >
                                                     <CheckCircle2 className="h-4 w-4 shrink-0 text-(--sj-primary)" />
@@ -727,6 +977,7 @@ function EmergencyPage() {
                             </div>
                         </section>
                     )}
+
 
                 {activeEmergency && (
                     <section className="overflow-hidden rounded-3xl border border-red-200 bg-(--sj-surface) shadow-sm">
@@ -792,10 +1043,11 @@ function EmergencyPage() {
                                     </p>
 
                                     <p className="mt-1 text-sm font-bold text-(--sj-text)">
-                                        GPS location captured
+                                        GPS location actively tracked
                                     </p>
                                 </div>
                             </div>
+
 
                             {activeEmergency.emergency_details && (
                                 <div className="mt-4 rounded-2xl border border-(--sj-border) bg-(--sj-background) p-4">
@@ -809,23 +1061,43 @@ function EmergencyPage() {
                                 </div>
                             )}
 
+
                             <div className="mt-6 rounded-2xl border border-(--sj-primary)/20 bg-(--sj-primary)/5 p-4">
                                 <div className="flex items-start gap-3">
                                     <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-(--sj-primary)" />
 
                                     <div>
                                         <p className="text-sm font-bold text-(--sj-text)">
-                                            Emergency request is being tracked
+                                            Live location sharing is active
                                         </p>
 
                                         <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
-                                            You can leave this page and return later.
-                                            Your SOS remains active until it is completed
-                                            or you close it.
+                                            Your latest GPS location is being securely sent while this emergency remains active.
+                                            Location tracking stops automatically when the SOS is closed.
                                         </p>
+
+                                        {currentLocation && (
+                                            <p className="mt-2 text-xs font-medium text-(--sj-text-soft)">
+                                                Current position:{' '}
+                                                {currentLocation.latitude.toFixed(6)}
+                                                {', '}
+                                                {currentLocation.longitude.toFixed(6)}
+                                            </p>
+                                        )}
+
+                                        {locationAccuracy !== null && (
+                                            <p className="mt-1 text-xs text-(--sj-text-soft)">
+                                                GPS accuracy:{' '}
+                                                {Math.round(
+                                                    locationAccuracy,
+                                                )}{' '}
+                                                metres
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             </div>
+
 
                             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                                 <Link
@@ -861,137 +1133,142 @@ function EmergencyPage() {
                 )}
 
 
-                {step !== 'confirm' && !activeEmergency && (
-                    <section className="rounded-3xl border border-(--sj-border) bg-(--sj-surface) p-6 shadow-sm sm:p-8">
-                        <div className="flex items-start gap-4">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-(--sj-primary)/10 text-(--sj-primary)">
-                                {step === 'created'
-                                    ? (
-                                        <CheckCircle2 className="h-6 w-6" />
-                                    )
-                                    : (
-                                        <LocateFixed className="h-6 w-6 animate-pulse" />
-                                    )}
-                            </div>
-
-                            <div>
-                                <p className="text-sm font-semibold text-(--sj-primary)">
-                                    Emergency assistance
-                                </p>
-
-                                <h2 className="mt-1 text-2xl font-bold text-(--sj-text)">
-                                    {step === 'locating'
-                                        ? 'Getting your location...'
-                                        : step === 'creating'
-                                            ? 'Creating your emergency request...'
-                                            : 'Emergency request created'}
-                                </h2>
-
-                                <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
-                                    {step === 'locating'
-                                        ? 'Please allow location access when your browser asks for permission.'
-                                        : step === 'creating'
-                                            ? 'Your emergency information and current location are being securely sent to Sanjeevani.'
-                                            : 'Your SOS has been successfully registered.'}
-                                </p>
-                            </div>
-                        </div>
-
-
-                        <div className="mt-8 space-y-3">
-                            {FLOW_STEPS.map(
-                                (
-                                    flowStep,
-                                ) => {
-                                    const Icon =
-                                        flowStep.icon;
-
-                                    const isActive =
-                                        flowStep.id ===
-                                        step;
-
-                                    const isCompleted =
-                                        (
-                                            step ===
-                                            'creating' &&
-                                            flowStep.id ===
-                                            'locating'
-                                        ) ||
-                                        (
-                                            step ===
-                                            'created' &&
-                                            (
-                                                flowStep.id ===
-                                                'locating' ||
-                                                flowStep.id ===
-                                                'creating' ||
-                                                flowStep.id ===
-                                                'created'
-                                            )
-                                        );
-
-                                    return (
-                                        <div
-                                            key={
-                                                flowStep.id
-                                            }
-                                            className={`flex items-center gap-4 rounded-2xl border p-4 ${isActive
-                                                ? 'border-(--sj-primary)/30 bg-(--sj-primary)/5'
-                                                : 'border-(--sj-border) bg-(--sj-background)'
-                                                }`}
-                                        >
-                                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isCompleted
-                                                ? 'bg-(--sj-primary)/10 text-(--sj-primary)'
-                                                : 'bg-(--sj-surface) text-(--sj-text-soft)'
-                                                }`}>
-                                                {isActive &&
-                                                    step !==
-                                                    'created' ? (
-                                                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-(--sj-primary)/20 border-t-(--sj-primary)" />
-                                                ) : (
-                                                    <Icon className="h-5 w-5" />
-                                                )}
-                                            </div>
-
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-bold text-(--sj-text)">
-                                                    {flowStep.label}
-                                                </p>
-
-                                                <p className="mt-1 text-xs text-(--sj-text-soft)">
-                                                    {flowStep.description}
-                                                </p>
-                                            </div>
-
-                                            {isCompleted &&
-                                                !isActive && (
-                                                    <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-(--sj-primary)" />
-                                                )}
-                                        </div>
-                                    );
-                                },
-                            )}
-                        </div>
-
-
-                        {currentLocation && (
-                            <div className="mt-6 rounded-2xl border border-(--sj-border) bg-(--sj-background) p-5">
-                                <div className="flex items-center gap-3">
-                                    <MapPin className="h-5 w-5 text-(--sj-primary)" />
-
-                                    <div>
-                                        <p className="text-sm font-bold text-(--sj-text)">
-                                            Current location captured
-                                        </p>
-
-                                        <p className="mt-1 text-xs text-(--sj-text-soft)">
-                                            GPS coordinates received successfully.
-                                        </p>
-                                    </div>
+                {step !== 'confirm' &&
+                    !activeEmergency && (
+                        <section className="rounded-3xl border border-(--sj-border) bg-(--sj-surface) p-6 shadow-sm sm:p-8">
+                            <div className="flex items-start gap-4">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-(--sj-primary)/10 text-(--sj-primary)">
+                                    {step === 'created'
+                                        ? (
+                                            <CheckCircle2 className="h-6 w-6" />
+                                        )
+                                        : (
+                                            <LocateFixed className="h-6 w-6 animate-pulse" />
+                                        )}
                                 </div>
 
-                                {locationAccuracy !==
-                                    null && (
+                                <div>
+                                    <p className="text-sm font-semibold text-(--sj-primary)">
+                                        Emergency assistance
+                                    </p>
+
+                                    <h2 className="mt-1 text-2xl font-bold text-(--sj-text)">
+                                        {step === 'locating'
+                                            ? 'Getting your location...'
+                                            : step === 'creating'
+                                                ? 'Creating your emergency request...'
+                                                : 'Emergency request created'}
+                                    </h2>
+
+                                    <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
+                                        {step === 'locating'
+                                            ? 'Please allow location access when your browser asks for permission.'
+                                            : step === 'creating'
+                                                ? 'Your emergency information and current location are being securely sent to Sanjeevani.'
+                                                : 'Your SOS has been successfully registered.'}
+                                    </p>
+                                </div>
+                            </div>
+
+
+                            <div className="mt-8 space-y-3">
+                                {FLOW_STEPS.map(
+                                    (
+                                        flowStep,
+                                    ) => {
+                                        const Icon =
+                                            flowStep.icon;
+
+                                        const isActive =
+                                            flowStep.id ===
+                                            step;
+
+                                        const isCompleted =
+                                            (
+                                                step ===
+                                                'creating' &&
+                                                flowStep.id ===
+                                                'locating'
+                                            ) ||
+                                            (
+                                                step ===
+                                                'created' &&
+                                                (
+                                                    flowStep.id ===
+                                                    'locating' ||
+                                                    flowStep.id ===
+                                                    'creating' ||
+                                                    flowStep.id ===
+                                                    'created'
+                                                )
+                                            );
+
+                                        return (
+                                            <div
+                                                key={
+                                                    flowStep.id
+                                                }
+                                                className={`flex items-center gap-4 rounded-2xl border p-4 ${
+                                                    isActive
+                                                        ? 'border-(--sj-primary)/30 bg-(--sj-primary)/5'
+                                                        : 'border-(--sj-border) bg-(--sj-background)'
+                                                }`}
+                                            >
+                                                <div
+                                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                                                        isCompleted
+                                                            ? 'bg-(--sj-primary)/10 text-(--sj-primary)'
+                                                            : 'bg-(--sj-surface) text-(--sj-text-soft)'
+                                                    }`}
+                                                >
+                                                    {isActive &&
+                                                        step !==
+                                                        'created' ? (
+                                                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-(--sj-primary)/20 border-t-(--sj-primary)" />
+                                                    ) : (
+                                                        <Icon className="h-5 w-5" />
+                                                    )}
+                                                </div>
+
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-(--sj-text)">
+                                                        {flowStep.label}
+                                                    </p>
+
+                                                    <p className="mt-1 text-xs text-(--sj-text-soft)">
+                                                        {flowStep.description}
+                                                    </p>
+                                                </div>
+
+                                                {isCompleted &&
+                                                    !isActive && (
+                                                        <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-(--sj-primary)" />
+                                                    )}
+                                            </div>
+                                        );
+                                    },
+                                )}
+                            </div>
+
+
+                            {currentLocation && (
+                                <div className="mt-6 rounded-2xl border border-(--sj-border) bg-(--sj-background) p-5">
+                                    <div className="flex items-center gap-3">
+                                        <MapPin className="h-5 w-5 text-(--sj-primary)" />
+
+                                        <div>
+                                            <p className="text-sm font-bold text-(--sj-text)">
+                                                Current location captured
+                                            </p>
+
+                                            <p className="mt-1 text-xs text-(--sj-text-soft)">
+                                                GPS coordinates received successfully.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {locationAccuracy !==
+                                        null && (
                                         <p className="mt-3 text-xs text-(--sj-text-soft)">
                                             Approximate GPS accuracy:{' '}
                                             {Math.round(
@@ -1000,75 +1277,77 @@ function EmergencyPage() {
                                             metres
                                         </p>
                                     )}
-                            </div>
-                        )}
+                                </div>
+                            )}
 
 
-                        {emergencyResult && (
-                            <div className="mt-6 rounded-2xl border border-(--sj-primary)/20 bg-(--sj-primary)/5 p-5">
-                                <div className="flex items-center gap-3">
-                                    <CheckCircle2 className="h-5 w-5 text-(--sj-primary)" />
+                            {emergencyResult && (
+                                <div className="mt-6 rounded-2xl border border-(--sj-primary)/20 bg-(--sj-primary)/5 p-5">
+                                    <div className="flex items-center gap-3">
+                                        <CheckCircle2 className="h-5 w-5 text-(--sj-primary)" />
 
-                                    <div>
-                                        <p className="text-sm font-bold text-(--sj-text)">
-                                            Emergency ID
-                                        </p>
+                                        <div>
+                                            <p className="text-sm font-bold text-(--sj-text)">
+                                                Emergency ID
+                                            </p>
 
-                                        <p className="mt-1 break-all font-mono text-xs text-(--sj-text-soft)">
-                                            {emergencyResult.id}
-                                        </p>
+                                            <p className="mt-1 break-all font-mono text-xs text-(--sj-text-soft)">
+                                                {emergencyResult.id}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                        <div className="rounded-xl bg-(--sj-surface) p-3">
+                                            <p className="text-xs text-(--sj-text-soft)">
+                                                Status
+                                            </p>
+
+                                            <p className="mt-1 text-sm font-bold text-(--sj-text)">
+                                                {emergencyResult.status}
+                                            </p>
+                                        </div>
+
+                                        <div className="rounded-xl bg-(--sj-surface) p-3">
+                                            <p className="text-xs text-(--sj-text-soft)">
+                                                Emergency type
+                                            </p>
+
+                                            <p className="mt-1 text-sm font-bold text-(--sj-text)">
+                                                {emergencyResult.emergency_type}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
+                            )}
 
-                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                    <div className="rounded-xl bg-(--sj-surface) p-3">
-                                        <p className="text-xs text-(--sj-text-soft)">
-                                            Status
-                                        </p>
 
-                                        <p className="mt-1 text-sm font-bold text-(--sj-text)">
-                                            {emergencyResult.status}
-                                        </p>
-                                    </div>
+                            {step === 'created' && (
+                                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                                    <button
+                                        type="button"
+                                        onClick={
+                                            resetEmergency
+                                        }
+                                        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-(--sj-border) bg-(--sj-surface) px-5 text-sm font-bold text-(--sj-text) transition hover:border-(--sj-primary)/30 hover:text-(--sj-primary)"
+                                    >
+                                        Return to emergency screen
+                                    </button>
 
-                                    <div className="rounded-xl bg-(--sj-surface) p-3">
-                                        <p className="text-xs text-(--sj-text-soft)">
-                                            Emergency type
-                                        </p>
+                                    <Link
+                                        to={`/dashboard/patient/tracking?emergency_id=${emergencyResult.id}`}
+                                        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-(--sj-primary) px-5 text-sm font-bold text-white transition hover:opacity-90"
+                                    >
+                                        <MapPin className="h-4 w-4" />
 
-                                        <p className="mt-1 text-sm font-bold text-(--sj-text)">
-                                            {emergencyResult.emergency_type}
-                                        </p>
-                                    </div>
+                                        Open tracking
+                                    </Link>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </section>
+                    )}
 
 
-                        {step === 'created' && (
-                            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                                <button
-                                    type="button"
-                                    onClick={
-                                        resetEmergency
-                                    }
-                                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-(--sj-border) bg-(--sj-surface) px-5 text-sm font-bold text-(--sj-text) transition hover:border-(--sj-primary)/30 hover:text-(--sj-primary)"
-                                >
-                                    Return to emergency screen
-                                </button>
-
-                                <Link
-                                    to={`/dashboard/patient/tracking?emergency_id=${emergencyResult.id}`}
-                                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-(--sj-primary) px-5 text-sm font-bold text-white transition hover:opacity-90"
-                                >
-                                    <MapPin className="h-4 w-4" />
-
-                                    Open tracking
-                                </Link>
-                            </div>
-                        )}
-                    </section>
-                )}
             </main>
 
 
@@ -1134,16 +1413,20 @@ function EmergencyPage() {
                                                         type.value,
                                                     )
                                                 }
-                                                className={`rounded-2xl border p-4 text-left transition ${isSelected
-                                                    ? 'border-(--sj-primary) bg-(--sj-primary)/5 ring-2 ring-(--sj-primary)/10'
-                                                    : 'border-(--sj-border) bg-(--sj-background) hover:border-(--sj-primary)/30'
-                                                    }`}
+                                                className={`rounded-2xl border p-4 text-left transition ${
+                                                    isSelected
+                                                        ? 'border-(--sj-primary) bg-(--sj-primary)/5 ring-2 ring-(--sj-primary)/10'
+                                                        : 'border-(--sj-border) bg-(--sj-background) hover:border-(--sj-primary)/30'
+                                                }`}
                                             >
                                                 <div className="flex items-start gap-3">
-                                                    <div className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 ${isSelected
-                                                        ? 'border-(--sj-primary) bg-(--sj-primary)'
-                                                        : 'border-(--sj-text-soft)'
-                                                        }`} />
+                                                    <div
+                                                        className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 ${
+                                                            isSelected
+                                                                ? 'border-(--sj-primary) bg-(--sj-primary)'
+                                                                : 'border-(--sj-text-soft)'
+                                                        }`}
+                                                    />
 
                                                     <div>
                                                         <p className="text-sm font-bold text-(--sj-text)">
@@ -1168,6 +1451,7 @@ function EmergencyPage() {
                                     className="text-sm font-bold text-(--sj-text)"
                                 >
                                     Anything else we should know?
+
                                     <span className="ml-1 font-normal text-(--sj-text-soft)">
                                         Optional
                                     </span>

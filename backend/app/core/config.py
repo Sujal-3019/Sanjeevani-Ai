@@ -24,6 +24,14 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_FROM_NAME: str = "Sanjeevani AI"
+    EMERGENCY_SHARE_BASE_URL: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

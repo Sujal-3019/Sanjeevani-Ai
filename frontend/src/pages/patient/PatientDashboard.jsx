@@ -1,8 +1,6 @@
 import React from 'react';
 import {
-    Bell,
     ChevronRight,
-    Clock3,
     FileHeart,
     History,
     MapPin,
@@ -12,12 +10,15 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { useTheme } from '../../context/ThemeContext';
 import PatientNavbar from '../../components/layout/PatientNavbar';
 import { useAuth } from '../../context/AuthContext';
+import authService from '../../services/authService';
 import { patientService } from '../../services/patientService';
 
-function calculateProfileCompleteness(profile) {
+
+function calculateProfileCompleteness(
+    profile,
+) {
     if (!profile) {
         return 0;
     }
@@ -37,23 +38,44 @@ function calculateProfileCompleteness(profile) {
         Boolean(profile.terms_accepted),
     ];
 
-    const completed = checks.filter(Boolean).length;
+    const completed =
+        checks.filter(Boolean).length;
 
-    return Math.round((completed / checks.length) * 100);
+    return Math.round(
+        (completed / checks.length) * 100,
+    );
 }
 
-function getFirstName(fullName) {
+
+function getFirstName(
+    fullName,
+) {
     if (!fullName) {
         return 'there';
     }
 
-    return fullName.trim().split(/\s+/)[0] || 'there';
+    return (
+        fullName
+            .trim()
+            .split(/\s+/)[0] ||
+        'there'
+    );
 }
 
-function getErrorMessage(error) {
-    if (Array.isArray(error?.data?.detail)) {
+
+function getErrorMessage(
+    error,
+) {
+    if (
+        Array.isArray(
+            error?.data?.detail,
+        )
+    ) {
         return error.data.detail
-            .map((item) => item?.msg)
+            .map(
+                (item) =>
+                    item?.msg,
+            )
             .filter(Boolean)
             .join(' ');
     }
@@ -62,31 +84,191 @@ function getErrorMessage(error) {
         error?.data?.detail ||
         error?.data?.message ||
         error?.message ||
-        'Unable to load your patient profile.'
+        'Unable to load your patient dashboard.'
     );
 }
 
+
+function normalizeEmergencyHistory(
+    response,
+) {
+    if (Array.isArray(response)) {
+        return response;
+    }
+
+    if (
+        Array.isArray(
+            response?.items,
+        )
+    ) {
+        return response.items;
+    }
+
+    if (
+        Array.isArray(
+            response?.emergencies,
+        )
+    ) {
+        return response.emergencies;
+    }
+
+    if (
+        Array.isArray(
+            response?.history,
+        )
+    ) {
+        return response.history;
+    }
+
+    return [];
+}
+
+
+function getEmergencyTypeLabel(
+    value,
+) {
+    if (!value) {
+        return 'Emergency';
+    }
+
+    return String(value)
+        .replaceAll('_', ' ')
+        .toLowerCase()
+        .replace(
+            /\b\w/g,
+            (letter) =>
+                letter.toUpperCase(),
+        );
+}
+
+
+function getEmergencyStatus(
+    emergency,
+) {
+    return (
+        emergency?.event_status ||
+        emergency?.emergency_event_status ||
+        emergency?.status ||
+        emergency?.sos_status ||
+        'UNKNOWN'
+    );
+}
+
+
+function getEmergencyStatusClass(
+    status,
+) {
+    const normalized =
+        String(status)
+            .toUpperCase();
+
+    if (
+        normalized ===
+            'COMPLETED' ||
+        normalized ===
+            'CANCELLED'
+    ) {
+        return 'sj-status';
+    }
+
+    return 'sj-status sj-status-success';
+}
+
+
+function getEmergencyDate(
+    emergency,
+) {
+    const rawDate =
+        emergency?.created_at ||
+        emergency?.updated_at ||
+        emergency?.createdAt ||
+        emergency?.date ||
+        null;
+
+    if (!rawDate) {
+        return 'Date unavailable';
+    }
+
+    const date =
+        new Date(rawDate);
+
+    if (
+        Number.isNaN(
+            date.getTime(),
+        )
+    ) {
+        return String(rawDate);
+    }
+
+    return date.toLocaleString(
+        undefined,
+        {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        },
+    );
+}
+
+
+function getEmergencyId(
+    emergency,
+) {
+    return (
+        emergency?.id ||
+        emergency?.sos_request_id ||
+        emergency?.emergency_id ||
+        null
+    );
+}
+
+
 function PatientDashboard() {
-    const { theme } = useTheme();
-    const { user } = useAuth();
+    const {
+        user,
+    } = useAuth();
 
-    const [profile, setProfile] = React.useState(null);
-    const [loading, setLoading] = React.useState(true);
-    const [error, setError] = React.useState('');
+    const [
+        profile,
+        setProfile,
+    ] = React.useState(null);
 
-    const isDark = theme === 'dark';
+    const [
+        emergencyHistory,
+        setEmergencyHistory,
+    ] = React.useState([]);
+
+    const [
+        activeEmergency,
+        setActiveEmergency,
+    ] = React.useState(null);
+
+    const [
+        loading,
+        setLoading,
+    ] = React.useState(true);
+
+    const [
+        error,
+        setError,
+    ] = React.useState('');
+
 
     React.useEffect(() => {
         let isMounted = true;
 
-        async function loadPatientProfile() {
+
+        async function loadDashboard() {
             setLoading(true);
             setError('');
 
+
             try {
-                const accessToken = localStorage.getItem(
-                    'sanjeevani_access_token',
-                );
+                const accessToken =
+                    authService.getAccessToken();
+
 
                 if (!accessToken) {
                     throw new Error(
@@ -94,24 +276,78 @@ function PatientDashboard() {
                     );
                 }
 
-                const response = await patientService.getProfile(
-                    accessToken,
-                );
 
-                if (isMounted) {
-                    setProfile(response);
-                }
-            } catch (requestError) {
+                const [
+                    profileResponse,
+                    historyResponse,
+                    activeResponse,
+                ] = await Promise.all([
+                    patientService.getProfile(
+                        accessToken,
+                    ),
+
+                    patientService.getEmergencyHistory(
+                        accessToken,
+                    ),
+
+                    patientService.getActiveEmergency(
+                        accessToken,
+                    ),
+                ]);
+
+
                 if (!isMounted) {
                     return;
                 }
 
-                if (requestError?.status === 404) {
-                    setProfile(null);
+
+                setProfile(
+                    profileResponse,
+                );
+
+
+                setEmergencyHistory(
+                    normalizeEmergencyHistory(
+                        historyResponse,
+                    ),
+                );
+
+
+                setActiveEmergency(
+                    activeResponse ||
+                    null,
+                );
+            } catch (
+                requestError
+            ) {
+                if (!isMounted) {
                     return;
                 }
 
-                setError(getErrorMessage(requestError));
+
+                console.error(
+                    'Failed to load patient dashboard:',
+                    requestError,
+                );
+
+
+                /*
+                 * Profile 404 simply means the patient has
+                 * not completed the profile yet.
+                 */
+                if (
+                    requestError?.status ===
+                    404
+                ) {
+                    setProfile(null);
+                }
+
+
+                setError(
+                    getErrorMessage(
+                        requestError,
+                    ),
+                );
             } finally {
                 if (isMounted) {
                     setLoading(false);
@@ -119,32 +355,93 @@ function PatientDashboard() {
             }
         }
 
-        loadPatientProfile();
+
+        loadDashboard();
+
 
         return () => {
             isMounted = false;
         };
     }, []);
 
-    const patientName = getFirstName(user?.full_name);
 
-    const city = profile?.city || 'Not provided';
-    const state = profile?.state || 'Not provided';
+    const patientName =
+        getFirstName(
+            user?.full_name,
+        );
 
-    const profileCompleteness = calculateProfileCompleteness(profile);
+
+    const city =
+        profile?.city ||
+        'Not provided';
+
+
+    const state =
+        profile?.state ||
+        'Not provided';
+
+
+    const profileCompleteness =
+        calculateProfileCompleteness(
+            profile,
+        );
+
 
     const profileComplete =
         Boolean(profile) &&
         profileCompleteness === 100 &&
-        Boolean(profile?.medical_sharing_accepted) &&
-        Boolean(profile?.terms_accepted);
+        Boolean(
+            profile?.medical_sharing_accepted,
+        ) &&
+        Boolean(
+            profile?.terms_accepted,
+        );
 
-    const emergencyContacts = profile?.emergency_contacts || [];
+
+    const emergencyContacts =
+        profile?.emergency_contacts ||
+        [];
+
 
     const primaryEmergencyContact =
-        emergencyContacts.find((contact) => contact.is_primary) ||
+        emergencyContacts.find(
+            (contact) =>
+                contact.is_primary,
+        ) ||
         emergencyContacts[0] ||
         null;
+
+
+    const recentEmergencies =
+        emergencyHistory
+            .slice()
+            .sort(
+                (
+                    first,
+                    second,
+                ) => {
+                    const firstDate =
+                        new Date(
+                            first?.created_at ||
+                            first?.updated_at ||
+                            0,
+                        ).getTime();
+
+                    const secondDate =
+                        new Date(
+                            second?.created_at ||
+                            second?.updated_at ||
+                            0,
+                        ).getTime();
+
+                    return (
+                        secondDate -
+                        firstDate
+                    );
+                },
+            )
+            .slice(0, 5);
+
 
     if (loading) {
         return (
@@ -156,7 +453,7 @@ function PatientDashboard() {
                         <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-(--sj-primary)/20 border-t-(--sj-primary)" />
 
                         <p className="mt-4 text-sm font-bold text-(--sj-text)">
-                            Loading your emergency profile...
+                            Loading your emergency dashboard...
                         </p>
 
                         <p className="mt-1 text-xs text-(--sj-text-muted)">
@@ -168,18 +465,13 @@ function PatientDashboard() {
         );
     }
 
+
     return (
         <div className="sanjeevani-page min-h-screen">
-            {/* =========================================================
-                HEADER
-            ========================================================= */}
-
             <PatientNavbar />
 
+
             <main className="mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-10">
-                {/* =====================================================
-                    ERROR
-                ===================================================== */}
 
                 {error && (
                     <section className="mb-6 rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
@@ -190,7 +482,7 @@ function PatientDashboard() {
 
                             <div>
                                 <p className="text-sm font-bold text-red-700 dark:text-red-300">
-                                    Unable to load profile
+                                    Some dashboard data could not be loaded
                                 </p>
 
                                 <p className="mt-1 text-xs leading-5 text-red-600/80 dark:text-red-300/80">
@@ -200,6 +492,7 @@ function PatientDashboard() {
                         </div>
                     </section>
                 )}
+
 
                 {/* =====================================================
                     WELCOME
@@ -225,10 +518,69 @@ function PatientDashboard() {
 
                         <div className="flex items-center gap-2 text-xs font-semibold text-(--sj-text-muted)">
                             <span className="h-2 w-2 rounded-full bg-emerald-500" />
+
                             Emergency network available
                         </div>
                     </div>
                 </section>
+
+
+                {/* =====================================================
+                    ACTIVE EMERGENCY
+                ===================================================== */}
+
+                {activeEmergency && (
+                    <section className="relative mb-8 overflow-hidden rounded-3xl border border-red-500/20 bg-red-500/4.5 p-6 sm:p-8">
+                        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-red-500/5 blur-3xl" />
+
+                        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                            <div>
+                                <div className="inline-flex items-center gap-2 rounded-full border border-red-500/15 bg-red-500/10 px-3 py-1.5">
+                                    <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+
+                                    <span className="text-[10px] font-black uppercase tracking-[0.15em] text-red-600 dark:text-red-400">
+                                        Active emergency
+                                    </span>
+                                </div>
+
+                                <h2 className="mt-4 text-2xl font-black tracking-tight text-(--sj-text)">
+                                    Your SOS is currently active
+                                </h2>
+
+                                <p className="mt-2 max-w-2xl text-sm leading-6 text-(--sj-text-soft)">
+                                    Your emergency request is still active.
+                                    Open tracking to view the current emergency status and location information.
+                                </p>
+
+                                <div className="mt-5 flex flex-wrap gap-3">
+                                    <span className="sj-status sj-status-success">
+                                        {getEmergencyStatus(
+                                            activeEmergency,
+                                        )}
+                                    </span>
+
+                                    {activeEmergency.emergency_type && (
+                                        <span className="sj-status">
+                                            {getEmergencyTypeLabel(
+                                                activeEmergency.emergency_type,
+                                            )}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            <Link
+                                to={`/dashboard/patient/tracking?emergency_id=${activeEmergency.id}`}
+                                className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-(--sj-primary) px-6 text-sm font-bold text-white transition hover:opacity-90"
+                            >
+                                <MapPin className="h-4 w-4" />
+
+                                Open tracking
+                            </Link>
+                        </div>
+                    </section>
+                )}
+
 
                 {/* =====================================================
                     SOS CARD
@@ -248,23 +600,27 @@ function PatientDashboard() {
                             </div>
 
                             <h2 className="text-2xl font-black tracking-tight text-(--sj-text) sm:text-3xl">
-                                Need emergency help?
+                                {activeEmergency
+                                    ? 'Emergency assistance is already active'
+                                    : 'Need emergency help?'}
                             </h2>
 
                             <p className="mt-3 text-sm leading-6 text-(--sj-text-soft)">
-                                Press SOS when you need urgent medical
-                                assistance. Your location can be shared with
-                                the emergency coordination network.
+                                {activeEmergency
+                                    ? 'You already have an active SOS. Do not create another emergency request.'
+                                    : 'Press SOS when you need urgent medical assistance. Your location can be shared with the emergency coordination network.'}
                             </p>
 
                             <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-(--sj-text-muted)">
                                 <span className="flex items-center gap-1.5">
                                     <MapPin className="h-3.5 w-3.5" />
+
                                     Location enabled
                                 </span>
 
                                 <span className="flex items-center gap-1.5">
                                     <ShieldCheck className="h-3.5 w-3.5" />
+
                                     Secure coordination
                                 </span>
                             </div>
@@ -275,15 +631,20 @@ function PatientDashboard() {
                                 to="/dashboard/patient/emergency"
                                 className="sj-sos-button w-full px-10 text-base sm:w-auto"
                             >
-                                SEND SOS
+                                {activeEmergency
+                                    ? 'VIEW SOS'
+                                    : 'SEND SOS'}
                             </Link>
 
                             <p className="mt-3 text-center text-[11px] font-medium text-(--sj-text-muted)">
-                                For genuine emergencies
+                                {activeEmergency
+                                    ? 'Active emergency request'
+                                    : 'For genuine emergencies'}
                             </p>
                         </div>
                     </div>
                 </section>
+
 
                 {/* =====================================================
                     QUICK ACTIONS
@@ -302,7 +663,9 @@ function PatientDashboard() {
                         </div>
                     </div>
 
+
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
                         <Link
                             to="/dashboard/patient/medical-profile"
                             className="sj-card-hover group p-5"
@@ -324,6 +687,7 @@ function PatientDashboard() {
                                 medications and other medical information.
                             </p>
                         </Link>
+
 
                         <Link
                             to="/dashboard/patient/emergency-contacts"
@@ -353,6 +717,7 @@ function PatientDashboard() {
                             )}
                         </Link>
 
+
                         <Link
                             to="/dashboard/patient/history"
                             className="sj-card-hover group p-5"
@@ -373,16 +738,26 @@ function PatientDashboard() {
                                 Review previous emergency requests and their
                                 outcomes.
                             </p>
+
+                            {emergencyHistory.length > 0 && (
+                                <p className="mt-3 text-[11px] font-semibold text-(--sj-text-muted)">
+                                    {emergencyHistory.length}{' '}
+                                    {emergencyHistory.length === 1
+                                        ? 'request'
+                                        : 'requests'}{' '}
+                                    recorded
+                                </p>
+                            )}
                         </Link>
                     </div>
                 </section>
+
 
                 {/* =====================================================
                     LOCATION + PROFILE STATUS
                 ===================================================== */}
 
                 <section className="mb-8 grid gap-5 lg:grid-cols-2">
-                    {/* Location */}
 
                     <div className="sj-card p-5 sm:p-6">
                         <div className="flex items-start justify-between gap-4">
@@ -411,7 +786,9 @@ function PatientDashboard() {
                                         : 'sj-status'
                                 }
                             >
-                                {profile ? 'Available' : 'Not set'}
+                                {profile
+                                    ? 'Available'
+                                    : 'Not set'}
                             </span>
                         </div>
 
@@ -430,7 +807,6 @@ function PatientDashboard() {
                         </div>
                     </div>
 
-                    {/* Profile status */}
 
                     <div className="sj-card p-5 sm:p-6">
                         <div className="flex items-start justify-between gap-4">
@@ -461,7 +837,9 @@ function PatientDashboard() {
                                         : 'sj-status'
                                 }
                             >
-                                {profileComplete ? 'Complete' : 'Incomplete'}
+                                {profileComplete
+                                    ? 'Complete'
+                                    : 'Incomplete'}
                             </span>
                         </div>
 
@@ -492,11 +870,13 @@ function PatientDashboard() {
                                 {profileComplete
                                     ? 'Review profile'
                                     : 'Complete profile'}
+
                                 <ChevronRight className="h-3.5 w-3.5" />
                             </Link>
                         </div>
                     </div>
                 </section>
+
 
                 {/* =====================================================
                     RECENT EMERGENCIES
@@ -522,24 +902,119 @@ function PatientDashboard() {
                         </Link>
                     </div>
 
+
                     <div className="sj-card overflow-hidden">
-                        <div className="px-6 py-12 text-center">
-                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-(--sj-surface-2) text-(--sj-text-muted)">
-                                <History className="h-5 w-5" />
+
+                        {recentEmergencies.length === 0 ? (
+                            <div className="px-6 py-12 text-center">
+                                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-(--sj-surface-2) text-(--sj-text-muted)">
+                                    <History className="h-5 w-5" />
+                                </div>
+
+                                <h3 className="mt-4 text-sm font-black text-(--sj-text)">
+                                    No emergency requests yet
+                                </h3>
+
+                                <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-(--sj-text-muted)">
+                                    Your emergency requests will appear here
+                                    after you use Sanjeevani AI emergency
+                                    assistance.
+                                </p>
                             </div>
+                        ) : (
+                            <div className="divide-y divide-(--sj-border)">
+                                {recentEmergencies.map(
+                                    (
+                                        emergency,
+                                        index,
+                                    ) => {
+                                        const emergencyId =
+                                            getEmergencyId(
+                                                emergency,
+                                            );
 
-                            <h3 className="mt-4 text-sm font-black text-(--sj-text)">
-                                No emergency requests yet
-                            </h3>
+                                        const status =
+                                            getEmergencyStatus(
+                                                emergency,
+                                            );
 
-                            <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-(--sj-text-muted)">
-                                Your emergency coordination requests will
-                                appear here once the emergency module is
-                                connected to the dashboard.
-                            </p>
-                        </div>
+                                        const type =
+                                            getEmergencyTypeLabel(
+                                                emergency?.emergency_type ||
+                                                emergency?.type,
+                                            );
+
+                                        const date =
+                                            getEmergencyDate(
+                                                emergency,
+                                            );
+
+                                        return (
+                                            <div
+                                                key={
+                                                    emergencyId ||
+                                                    index
+                                                }
+                                                className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+                                            >
+                                                <div className="flex min-w-0 items-start gap-4">
+                                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-(--sj-primary)/10 text-(--sj-primary)">
+                                                        <History className="h-5 w-5" />
+                                                    </div>
+
+                                                    <div className="min-w-0">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <h3 className="text-sm font-black text-(--sj-text)">
+                                                                {type}
+                                                            </h3>
+
+                                                            <span
+                                                                className={getEmergencyStatusClass(
+                                                                    status,
+                                                                )}
+                                                            >
+                                                                {status}
+                                                            </span>
+                                                        </div>
+
+                                                        <p className="mt-1 text-xs text-(--sj-text-muted)">
+                                                            {date}
+                                                        </p>
+
+                                                        {emergencyId && (
+                                                            <p className="mt-1 break-all font-mono text-[10px] text-(--sj-text-muted)">
+                                                                ID: {emergencyId}
+                                                            </p>
+                                                        )}
+
+                                                        {emergency?.emergency_details && (
+                                                            <p className="mt-2 line-clamp-2 text-xs leading-5 text-(--sj-text-soft)">
+                                                                {emergency.emergency_details}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+
+                                                {emergencyId && (
+                                                    <Link
+                                                        to={`/dashboard/patient/tracking?emergency_id=${emergencyId}`}
+                                                        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-(--sj-border) px-4 py-2.5 text-xs font-bold text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-primary)"
+                                                    >
+                                                        View details
+
+                                                        <ChevronRight className="h-3.5 w-3.5" />
+                                                    </Link>
+                                                )}
+                                            </div>
+                                        );
+                                    },
+                                )}
+                            </div>
+                        )}
                     </div>
                 </section>
+
 
                 {/* =====================================================
                     SAFETY MESSAGE
@@ -568,11 +1043,13 @@ function PatientDashboard() {
                             className="inline-flex items-center justify-center gap-2 rounded-xl border border-(--sj-border) px-4 py-2.5 text-xs font-bold text-(--sj-text-soft) transition hover:border-(--sj-primary)/40 hover:text-(--sj-text)"
                         >
                             Manage profile
+
                             <ChevronRight className="h-3.5 w-3.5" />
                         </Link>
                     </div>
                 </section>
             </main>
+
 
             {/* =========================================================
                 MOBILE BOTTOM NAV
@@ -580,6 +1057,7 @@ function PatientDashboard() {
 
             <nav className="sticky bottom-0 z-30 border-t border-(--sj-border) bg-(--sj-bg)/95 px-4 py-3 backdrop-blur-xl sm:hidden">
                 <div className="mx-auto grid max-w-md grid-cols-4 gap-2">
+
                     <Link
                         to="/dashboard/patient"
                         className="flex flex-col items-center gap-1 rounded-xl bg-(--sj-primary)/10 px-2 py-2 text-(--sj-primary)"
@@ -590,6 +1068,7 @@ function PatientDashboard() {
                             Home
                         </span>
                     </Link>
+
 
                     <Link
                         to="/dashboard/patient/medical-profile"
@@ -602,6 +1081,7 @@ function PatientDashboard() {
                         </span>
                     </Link>
 
+
                     <Link
                         to="/dashboard/patient/history"
                         className="flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-(--sj-text-muted) transition hover:text-(--sj-text)"
@@ -613,6 +1093,7 @@ function PatientDashboard() {
                         </span>
                     </Link>
 
+
                     <Link
                         to="/"
                         className="flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-(--sj-text-muted) transition hover:text-(--sj-text)"
@@ -623,10 +1104,12 @@ function PatientDashboard() {
                             Account
                         </span>
                     </Link>
+
                 </div>
             </nav>
         </div>
     );
 }
+
 
 export default PatientDashboard;

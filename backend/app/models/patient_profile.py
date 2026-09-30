@@ -30,7 +30,10 @@ class PatientProfile(Base):
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE",
+        ),
         nullable=False,
         unique=True,
         index=True,
@@ -79,6 +82,16 @@ class PatientProfile(Base):
     pincode: Mapped[str] = mapped_column(
         String(6),
         nullable=False,
+    )
+
+    latitude: Mapped[Decimal | None] = mapped_column(
+        Numeric(9, 6),
+        nullable=True,
+    )
+
+    longitude: Mapped[Decimal | None] = mapped_column(
+        Numeric(9, 6),
+        nullable=True,
     )
 
     pregnancy_status: Mapped[str | None] = mapped_column(

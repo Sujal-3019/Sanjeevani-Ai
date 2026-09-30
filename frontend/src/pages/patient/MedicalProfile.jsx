@@ -5,7 +5,10 @@ import {
     Edit3,
     FileHeart,
     LockKeyhole,
+    LocateFixed,
+    LoaderCircle,
     Mail,
+    MapPin,
     Phone,
     Save,
     ShieldCheck,
@@ -17,6 +20,7 @@ import PatientNavbar from '../../components/layout/PatientNavbar';
 import { useAuth } from '../../context/AuthContext';
 import {
     getPatientProfile,
+    reverseGeocodePatientLocation,
     updatePatientProfile,
 } from '../../services/patientService';
 
@@ -27,6 +31,10 @@ const PREGNANCY_MAX_AGE = 55;
 
 const emptyProfile = {
     dob: '',
+
+    latitude: '',
+    longitude: '',
+
     gender: '',
     bloodGroup: '',
 
@@ -271,6 +279,18 @@ function mapProfileToForm(profile) {
         dob:
             profile?.date_of_birth || '',
 
+        latitude:
+            profile?.latitude !== null &&
+                profile?.latitude !== undefined
+                ? String(profile.latitude)
+                : '',
+
+        longitude:
+            profile?.longitude !== null &&
+                profile?.longitude !== undefined
+                ? String(profile.longitude)
+                : '',
+
         gender:
             profile?.gender || '',
 
@@ -318,13 +338,13 @@ function mapProfileToForm(profile) {
 
         height:
             profile?.height_cm !== null &&
-            profile?.height_cm !== undefined
+                profile?.height_cm !== undefined
                 ? String(profile.height_cm)
                 : '',
 
         weight:
             profile?.weight_kg !== null &&
-            profile?.weight_kg !== undefined
+                profile?.weight_kg !== undefined
                 ? String(profile.weight_kg)
                 : '',
 
@@ -379,6 +399,21 @@ function MedicalProfile() {
 
     const [saveError, setSaveError] =
         React.useState('');
+
+    const [
+        isFetchingLocation,
+        setIsFetchingLocation,
+    ] = React.useState(false);
+
+    const [
+        locationMessage,
+        setLocationMessage,
+    ] = React.useState('');
+
+    const [
+        locationError,
+        setLocationError,
+    ] = React.useState('');
 
     const patientAge =
         calculateAge(formData.dob);
@@ -555,6 +590,16 @@ function MedicalProfile() {
 
         setSaveMessage('');
         setSaveError('');
+
+        if (
+            name === 'address' ||
+            name === 'city' ||
+            name === 'state' ||
+            name === 'pincode'
+        ) {
+            setLocationMessage('');
+            setLocationError('');
+        }
     };
 
     /*
@@ -579,6 +624,134 @@ function MedicalProfile() {
         setIsEditing(false);
         setSaveMessage('');
         setSaveError('');
+    };
+
+    const handleUseCurrentLocation = () => {
+        if (isFetchingLocation) {
+            return;
+        }
+
+        if (!navigator.geolocation) {
+            setLocationError(
+                'Location services are not supported by this browser.',
+            );
+
+            setLocationMessage('');
+
+            return;
+        }
+
+        setIsFetchingLocation(true);
+        setLocationMessage('');
+        setLocationError('');
+
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const latitude =
+                    position.coords.latitude;
+
+                const longitude =
+                    position.coords.longitude;
+
+                try {
+                    const accessToken =
+                        getAccessToken();
+
+                    if (!accessToken) {
+                        throw new Error(
+                            'Authentication required. Please log in again.',
+                        );
+                    }
+
+                    const location =
+                        await reverseGeocodePatientLocation(
+                            latitude,
+                            longitude,
+                            accessToken,
+                        );
+
+                    setFormData((current) => ({
+                        ...current,
+
+                        address:
+                            location?.address ||
+                            current.address,
+
+                        city:
+                            location?.city ||
+                            current.city,
+
+                        state:
+                            location?.state ||
+                            current.state,
+
+                        pincode:
+                            location?.pincode ||
+                            current.pincode,
+
+                        latitude:
+                            String(latitude),
+
+                        longitude:
+                            String(longitude),
+                    }));
+
+                    setLocationMessage(
+                        'Your current location was detected successfully. Please review the address before saving.',
+                    );
+
+                    setLocationError('');
+                    setSaveMessage('');
+                    setSaveError('');
+                } catch (error) {
+                    console.error(
+                        'Failed to determine current location:',
+                        error,
+                    );
+
+                    setLocationError(
+                        getErrorMessage(error),
+                    );
+
+                    setLocationMessage('');
+                } finally {
+                    setIsFetchingLocation(false);
+                }
+            },
+            (error) => {
+                let message =
+                    'Unable to access your current location.';
+
+                if (
+                    error.code ===
+                    error.PERMISSION_DENIED
+                ) {
+                    message =
+                        'Location permission was denied. Please allow location access in your browser settings and try again.';
+                } else if (
+                    error.code ===
+                    error.POSITION_UNAVAILABLE
+                ) {
+                    message =
+                        'Your location could not be determined. Please check GPS/location services and try again.';
+                } else if (
+                    error.code ===
+                    error.TIMEOUT
+                ) {
+                    message =
+                        'Location detection timed out. Please try again.';
+                }
+
+                setLocationError(message);
+                setLocationMessage('');
+                setIsFetchingLocation(false);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0,
+            },
+        );
     };
 
     /*
@@ -699,6 +872,16 @@ function MedicalProfile() {
                 pincode:
                     formData.pincode.trim(),
 
+                latitude:
+                    formData.latitude
+                        ? Number(formData.latitude)
+                        : null,
+
+                longitude:
+                    formData.longitude
+                        ? Number(formData.longitude)
+                        : null,
+
                 height_cm:
                     formData.height
                         ? Number(formData.height)
@@ -712,7 +895,7 @@ function MedicalProfile() {
                 pregnancy_status:
                     shouldAskPregnancyStatus
                         ? formData.pregnancyStatus ||
-                          null
+                        null
                         : null,
 
                 /*
@@ -825,6 +1008,8 @@ function MedicalProfile() {
             setIsSaving(false);
         }
     };
+
+
 
     /*
      * =============================================================
@@ -1213,6 +1398,252 @@ function MedicalProfile() {
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    </section>
+
+                    <section className="sj-card overflow-hidden">
+                        <div className="border-b border-(--sj-border) px-5 py-5 sm:px-6">
+                            <div className="flex items-start gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
+                                    <MapPin className="h-5 w-5" />
+                                </div>
+
+                                <div>
+                                    <h2 className="text-lg font-black text-(--sj-text)">
+                                        Location information
+                                    </h2>
+
+                                    <p className="mt-1 text-sm text-(--sj-text-soft)">
+                                        Keep your saved location updated so
+                                        Sanjeevani AI can use it when relevant
+                                        to emergency coordination.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-5 p-5 sm:p-6">
+                            {isEditing && (
+                                <div className="rounded-2xl border border-(--sj-primary)/20 bg-(--sj-primary)/5 p-4">
+                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="flex items-start gap-3">
+                                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-(--sj-primary)/10 text-(--sj-primary)">
+                                                <LocateFixed className="h-4 w-4" />
+                                            </div>
+
+                                            <div>
+                                                <p className="text-sm font-black text-(--sj-text)">
+                                                    Automatically detect your location
+                                                </p>
+
+                                                <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
+                                                    Your browser will request location
+                                                    permission. We will use your GPS
+                                                    coordinates to determine the address.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={
+                                                handleUseCurrentLocation
+                                            }
+                                            disabled={
+                                                isFetchingLocation
+                                            }
+                                            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-(--sj-primary)/30 bg-(--sj-surface) px-4 py-3 text-sm font-bold text-(--sj-primary) transition hover:border-(--sj-primary) hover:bg-(--sj-primary)/5 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {isFetchingLocation ? (
+                                                <>
+                                                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                                                    Detecting...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <LocateFixed className="h-4 w-4" />
+                                                    Use my current location
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {locationMessage && (
+                                <div className="flex items-start gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                                    <Check className="mt-0.5 h-4 w-4 shrink-0" />
+
+                                    <span>
+                                        {locationMessage}
+                                    </span>
+                                </div>
+                            )}
+
+                            {locationError && (
+                                <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-400">
+                                    {locationError}
+                                </div>
+                            )}
+
+                            <div>
+                                <FieldLabel>
+                                    Address
+                                </FieldLabel>
+
+                                {isEditing ? (
+                                    <textarea
+                                        name="address"
+                                        value={
+                                            formData.address
+                                        }
+                                        onChange={
+                                            handleChange
+                                        }
+                                        rows="3"
+                                        className="sj-input resize-none px-4 py-3 text-sm"
+                                        placeholder="House number, street, locality"
+                                    />
+                                ) : (
+                                    <div className="min-h-20 rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3 text-sm leading-6 text-(--sj-text)">
+                                        {displayValue(
+                                            savedData.address,
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid gap-5 sm:grid-cols-3">
+                                <div>
+                                    <FieldLabel required>
+                                        City
+                                    </FieldLabel>
+
+                                    {isEditing ? (
+                                        <input
+                                            type="text"
+                                            name="city"
+                                            value={
+                                                formData.city
+                                            }
+                                            onChange={
+                                                handleChange
+                                            }
+                                            className="sj-input px-4 py-3 text-sm"
+                                            placeholder="e.g. New Delhi"
+                                        />
+                                    ) : (
+                                        <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3 text-sm font-semibold text-(--sj-text)">
+                                            {displayValue(
+                                                savedData.city,
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <FieldLabel required>
+                                        State
+                                    </FieldLabel>
+
+                                    {isEditing ? (
+                                        <input
+                                            type="text"
+                                            name="state"
+                                            value={
+                                                formData.state
+                                            }
+                                            onChange={
+                                                handleChange
+                                            }
+                                            className="sj-input px-4 py-3 text-sm"
+                                            placeholder="e.g. Delhi"
+                                        />
+                                    ) : (
+                                        <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3 text-sm font-semibold text-(--sj-text)">
+                                            {displayValue(
+                                                savedData.state,
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <FieldLabel required>
+                                        Pincode
+                                    </FieldLabel>
+
+                                    {isEditing ? (
+                                        <input
+                                            type="text"
+                                            name="pincode"
+                                            value={
+                                                formData.pincode
+                                            }
+                                            onChange={
+                                                handleChange
+                                            }
+                                            maxLength="6"
+                                            inputMode="numeric"
+                                            className="sj-input px-4 py-3 text-sm"
+                                            placeholder="6-digit pincode"
+                                        />
+                                    ) : (
+                                        <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) px-4 py-3 text-sm font-semibold text-(--sj-text)">
+                                            {displayValue(
+                                                savedData.pincode,
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {isEditing &&
+                                formData.latitude &&
+                                formData.longitude && (
+                                    <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) p-4">
+                                        <div className="flex items-start gap-3">
+                                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-(--sj-primary)" />
+
+                                            <div>
+                                                <p className="text-xs font-black uppercase tracking-[0.14em] text-(--sj-text-muted)">
+                                                    GPS coordinates
+                                                </p>
+
+                                                <p className="mt-1 text-sm font-semibold text-(--sj-text)">
+                                                    {formData.latitude},{' '}
+                                                    {formData.longitude}
+                                                </p>
+
+                                                <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
+                                                    These coordinates will be saved
+                                                    with your patient profile.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                            {!isEditing &&
+                                savedData.latitude &&
+                                savedData.longitude && (
+                                    <div className="rounded-xl border border-(--sj-border) bg-(--sj-surface-2) p-4">
+                                        <div className="flex items-start gap-3">
+                                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-(--sj-primary)" />
+
+                                            <div>
+                                                <p className="text-xs font-black uppercase tracking-[0.14em] text-(--sj-text-muted)">
+                                                    Saved GPS location
+                                                </p>
+
+                                                <p className="mt-1 text-sm font-semibold text-(--sj-text)">
+                                                    {savedData.latitude},{' '}
+                                                    {savedData.longitude}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                         </div>
                     </section>
 

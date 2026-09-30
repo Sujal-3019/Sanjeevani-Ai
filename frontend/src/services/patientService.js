@@ -1,6 +1,5 @@
 import { api } from './api.js';
 
-
 export async function getPatientProfile(
     token,
 ) {
@@ -11,7 +10,6 @@ export async function getPatientProfile(
         },
     );
 }
-
 
 export async function createPatientProfile(
     payload,
@@ -26,7 +24,6 @@ export async function createPatientProfile(
     );
 }
 
-
 export async function updatePatientProfile(
     payload,
     token,
@@ -40,38 +37,29 @@ export async function updatePatientProfile(
     );
 }
 
-
-export async function getEmergencyHistory(
+export async function reverseGeocodePatientLocation(
+    latitude,
+    longitude,
     token,
 ) {
     return api.get(
-        '/patient/emergency-history',
+        `/patient/location/reverse-geocode?latitude=${encodeURIComponent(
+            latitude,
+        )}&longitude=${encodeURIComponent(
+            longitude,
+        )}`,
         {
             token,
         },
     );
 }
-
-
-export async function getActiveEmergency(
-    token,
-) {
-    return api.get(
-        '/patient/emergency-active',
-        {
-            token,
-        },
-    );
-}
-
 
 export const patientService = {
     getProfile: getPatientProfile,
     createProfile: createPatientProfile,
     updateProfile: updatePatientProfile,
-    getEmergencyHistory,
-    getActiveEmergency,
+    reverseGeocodeLocation:
+        reverseGeocodePatientLocation,
 };
-
 
 export default patientService;

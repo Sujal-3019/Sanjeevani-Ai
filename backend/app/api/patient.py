@@ -46,6 +46,14 @@ from app.services.sos_service import (
     SOSService,
 )
 
+import json
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
+from app.schemas.patient_profile import (
+    PatientReverseGeocodeResponse,
+)
+
 
 router = APIRouter(
     tags=["Patient"],
@@ -100,6 +108,8 @@ def _serialize_patient_profile(profile):
         "city": profile.city,
         "state": profile.state,
         "pincode": profile.pincode,
+        "latitude": profile.latitude,
+        "longitude": profile.longitude,
         "pregnancy_status": profile.pregnancy_status,
         "medical_sharing_accepted": (
             profile.medical_sharing_accepted
@@ -786,3 +796,108 @@ def get_emergency_history(
         )
 
     return history
+
+
+@router.get(
+    "/location/reverse-geocode",
+    response_model=PatientReverseGeocodeResponse,
+)
+def reverse_geocode_patient_location(
+    latitude: float,
+    longitude: float,
+    current_user: User = Depends(
+        patient_role_dependency,
+    ),
+):
+    if not -90 <= latitude <= 90:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid latitude.",
+        )
+
+    if not -180 <= longitude <= 180:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid longitude.",
+        )
+
+    query = urlencode(
+        {
+            "lat": latitude,
+            "lon": longitude,
+            "format": "jsonv2",
+            "addressdetails": 1,
+            "zoom": 18,
+        }
+    )
+
+    request = Request(
+        f"https://nominatim.openstreetmap.org/reverse?{query}",
+        headers={
+            "User-Agent": (
+                "SanjeevaniAI/1.0 "
+                "(emergency-healthcare-platform)"
+            ),
+            "Accept": "application/json",
+        },
+    )
+
+    try:
+        with urlopen(
+            request,
+            timeout=10,
+        ) as response:
+            data = json.loads(
+                response.read().decode("utf-8"),
+            )
+
+    except Exception as error:
+        print(
+            "Reverse geocoding failed:",
+            error,
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Unable to determine the address from "
+                "your current location. Please enter "
+                "your address manually."
+            ),
+        ) from error
+
+    address_data = data.get(
+        "address",
+        {},
+    )
+
+    city = (
+        address_data.get("city")
+        or address_data.get("town")
+        or address_data.get("village")
+        or address_data.get("municipality")
+        or address_data.get("county")
+    )
+
+    state = address_data.get("state")
+
+    pincode = address_data.get(
+        "postcode",
+    )
+
+    display_address = data.get(
+        "display_name",
+    )
+
+    return {
+        "latitude": latitude,
+        "longitude": longitude,
+        "address": display_address,
+        "city": city,
+        "state": state,
+        "pincode": (
+            str(pincode)
+            if pincode
+            else None
+        ),
+    }

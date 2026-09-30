@@ -40,18 +40,24 @@ ALLOWED_PREGNANCY_STATUSES = {
 
 
 class PatientProfileServiceError(Exception):
-    """Base exception for patient profile service errors."""
+    """Base exception for patient profile errors."""
 
 
-class PatientProfileNotFoundError(PatientProfileServiceError):
+class PatientProfileNotFoundError(
+    PatientProfileServiceError,
+):
     """Raised when a patient profile does not exist."""
 
 
-class InvalidPatientProfileError(PatientProfileServiceError):
+class InvalidPatientProfileError(
+    PatientProfileServiceError,
+):
     """Raised when patient profile data is invalid."""
 
 
-def calculate_age(date_of_birth: date) -> int:
+def calculate_age(
+    date_of_birth: date,
+) -> int:
     today = date.today()
 
     age = (
@@ -59,7 +65,10 @@ def calculate_age(date_of_birth: date) -> int:
         - date_of_birth.year
         - (
             (today.month, today.day)
-            < (date_of_birth.month, date_of_birth.day)
+            < (
+                date_of_birth.month,
+                date_of_birth.day,
+            )
         )
     )
 
@@ -88,7 +97,9 @@ def _validate_profile_data(
             "Date of birth cannot be in the future."
         )
 
-    age = calculate_age(data.date_of_birth)
+    age = calculate_age(
+        data.date_of_birth,
+    )
 
     if age < 0:
         raise InvalidPatientProfileError(
@@ -115,7 +126,9 @@ def _validate_profile_data(
             )
 
     if data.pregnancy_status is not None:
-        pregnancy_status = data.pregnancy_status.lower()
+        pregnancy_status = (
+            data.pregnancy_status.lower()
+        )
 
         if pregnancy_status not in ALLOWED_PREGNANCY_STATUSES:
             raise InvalidPatientProfileError(
@@ -125,7 +138,9 @@ def _validate_profile_data(
         should_ask_pregnancy = (
             data.gender is not None
             and data.gender.lower() == "female"
-            and PREGNANCY_MIN_AGE <= age <= PREGNANCY_MAX_AGE
+            and PREGNANCY_MIN_AGE
+            <= age
+            <= PREGNANCY_MAX_AGE
         )
 
         if not should_ask_pregnancy:
@@ -145,6 +160,34 @@ def _validate_profile_data(
                 "Weight must be between 1 kg and 500 kg."
             )
 
+    if data.latitude is not None:
+        if not -90 <= data.latitude <= 90:
+            raise InvalidPatientProfileError(
+                "Latitude must be between -90 and 90."
+            )
+
+    if data.longitude is not None:
+        if not -180 <= data.longitude <= 180:
+            raise InvalidPatientProfileError(
+                "Longitude must be between -180 and 180."
+            )
+
+    if (
+        data.latitude is not None
+        and data.longitude is None
+    ):
+        raise InvalidPatientProfileError(
+            "Longitude is required when latitude is provided."
+        )
+
+    if (
+        data.longitude is not None
+        and data.latitude is None
+    ):
+        raise InvalidPatientProfileError(
+            "Latitude is required when longitude is provided."
+        )
+
     if not data.medical_sharing_accepted:
         raise InvalidPatientProfileError(
             "Medical information sharing consent is required."
@@ -162,10 +205,16 @@ def _load_patient_profile(
 ) -> PatientProfile | None:
     statement = (
         select(PatientProfile)
-        .where(PatientProfile.user_id == user_id)
+        .where(
+            PatientProfile.user_id == user_id,
+        )
         .options(
-            joinedload(PatientProfile.emergency_contacts),
-            joinedload(PatientProfile.medical_profile),
+            joinedload(
+                PatientProfile.emergency_contacts,
+            ),
+            joinedload(
+                PatientProfile.medical_profile,
+            ),
         )
     )
 
@@ -200,6 +249,7 @@ class PatientProfileService:
         data: PatientProfileCreate,
     ) -> PatientProfile:
         _validate_patient(user)
+
         _validate_profile_data(data)
 
         profile = _load_patient_profile(
@@ -212,9 +262,11 @@ class PatientProfileService:
                 profile = PatientProfile(
                     user_id=user.id,
                     date_of_birth=data.date_of_birth,
-                    gender=data.gender.lower()
-                    if data.gender
-                    else None,
+                    gender=(
+                        data.gender.lower()
+                        if data.gender
+                        else None
+                    ),
                     blood_group=data.blood_group,
                     height_cm=data.height_cm,
                     weight_kg=data.weight_kg,
@@ -222,6 +274,8 @@ class PatientProfileService:
                     city=data.city,
                     state=data.state,
                     pincode=data.pincode,
+                    latitude=data.latitude,
+                    longitude=data.longitude,
                     pregnancy_status=(
                         data.pregnancy_status.lower()
                         if data.pregnancy_status
@@ -234,33 +288,60 @@ class PatientProfileService:
                 )
 
                 db.add(profile)
+
                 db.flush()
 
             else:
-                profile.date_of_birth = data.date_of_birth
+                profile.date_of_birth = (
+                    data.date_of_birth
+                )
+
                 profile.gender = (
                     data.gender.lower()
                     if data.gender
                     else None
                 )
-                profile.blood_group = data.blood_group
-                profile.height_cm = data.height_cm
-                profile.weight_kg = data.weight_kg
+
+                profile.blood_group = (
+                    data.blood_group
+                )
+
+                profile.height_cm = (
+                    data.height_cm
+                )
+
+                profile.weight_kg = (
+                    data.weight_kg
+                )
+
                 profile.address = data.address
+
                 profile.city = data.city
+
                 profile.state = data.state
+
                 profile.pincode = data.pincode
+
+                profile.latitude = data.latitude
+
+                profile.longitude = data.longitude
+
                 profile.pregnancy_status = (
                     data.pregnancy_status.lower()
                     if data.pregnancy_status
                     else None
                 )
+
                 profile.medical_sharing_accepted = (
                     data.medical_sharing_accepted
                 )
-                profile.terms_accepted = data.terms_accepted
+
+                profile.terms_accepted = (
+                    data.terms_accepted
+                )
+
                 profile.updated_at = datetime.now(
-                    timezone.utc
+                    timezone.utc,
                 )
 
             if profile.emergency_contacts:
@@ -277,16 +358,22 @@ class PatientProfileService:
                 primary_contact.name = (
                     data.emergency_contact.name
                 )
+
                 primary_contact.contact_relationship = (
                     data.emergency_contact.relationship
                 )
+
                 primary_contact.mobile_number = (
                     data.emergency_contact.mobile_number
                 )
+
                 primary_contact.is_primary = True
 
                 for contact in profile.emergency_contacts:
-                    if contact.id != primary_contact.id:
+                    if (
+                        contact.id
+                        != primary_contact.id
+                    ):
                         contact.is_primary = False
 
             else:
@@ -307,7 +394,9 @@ class PatientProfileService:
             if profile.medical_profile is None:
                 medical_profile = PatientMedicalProfile(
                     patient_profile_id=profile.id,
-                    allergies=data.medical_profile.allergies,
+                    allergies=(
+                        data.medical_profile.allergies
+                    ),
                     chronic_conditions=(
                         data.medical_profile.chronic_conditions
                     ),
@@ -317,31 +406,40 @@ class PatientProfileService:
                     major_surgeries=(
                         data.medical_profile.major_surgeries
                     ),
-                    disabilities=data.medical_profile.disabilities,
+                    disabilities=(
+                        data.medical_profile.disabilities
+                    ),
                 )
 
                 db.add(medical_profile)
 
             else:
-                medical_profile = profile.medical_profile
+                medical_profile = (
+                    profile.medical_profile
+                )
 
                 medical_profile.allergies = (
                     data.medical_profile.allergies
                 )
+
                 medical_profile.chronic_conditions = (
                     data.medical_profile.chronic_conditions
                 )
+
                 medical_profile.current_medications = (
                     data.medical_profile.current_medications
                 )
+
                 medical_profile.major_surgeries = (
                     data.medical_profile.major_surgeries
                 )
+
                 medical_profile.disabilities = (
                     data.medical_profile.disabilities
                 )
-                medical_profile.updated_at = datetime.now(
-                    timezone.utc
+
+                medical_profile.updated_at = (
+                    datetime.now(timezone.utc)
                 )
 
             db.commit()

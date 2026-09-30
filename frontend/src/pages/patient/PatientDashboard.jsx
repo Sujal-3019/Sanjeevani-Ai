@@ -14,7 +14,7 @@ import PatientNavbar from '../../components/layout/PatientNavbar';
 import { useAuth } from '../../context/AuthContext';
 import authService from '../../services/authService';
 import { patientService } from '../../services/patientService';
-
+import emergencyService from '../../services/emergencyService';
 
 function calculateProfileCompleteness(
     profile,
@@ -164,9 +164,9 @@ function getEmergencyStatusClass(
 
     if (
         normalized ===
-            'COMPLETED' ||
+        'COMPLETED' ||
         normalized ===
-            'CANCELLED'
+        'CANCELLED'
     ) {
         return 'sj-status';
     }
@@ -286,11 +286,11 @@ function PatientDashboard() {
                         accessToken,
                     ),
 
-                    patientService.getEmergencyHistory(
+                    emergencyService.getHistory(
                         accessToken,
                     ),
 
-                    patientService.getActiveEmergency(
+                    emergencyService.getActiveEmergency(
                         accessToken,
                     ),
                 ]);
@@ -318,7 +318,7 @@ function PatientDashboard() {
                     null,
                 );
             } catch (
-                requestError
+            requestError
             ) {
                 if (!isMounted) {
                     return;
@@ -824,8 +824,8 @@ function PatientDashboard() {
                                         {profileComplete
                                             ? 'Emergency ready'
                                             : profile
-                                              ? 'Profile incomplete'
-                                              : 'Profile not completed'}
+                                                ? 'Profile incomplete'
+                                                : 'Profile not completed'}
                                     </h2>
                                 </div>
                             </div>

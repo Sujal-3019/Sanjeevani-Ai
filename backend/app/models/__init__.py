@@ -9,6 +9,7 @@ from app.models.patient_profile import PatientProfile
 from app.models.refresh_token import RefreshToken
 from app.models.sos_request import SOSRequest
 from app.models.user import User
+from app.models.hospital import Hospital
 
 __all__ = [
     "PatientLocationUpdate",
@@ -22,4 +23,5 @@ __all__ = [
     "PatientMedicalProfile",
     "SOSRequest",
     "EmergencyEvent",
+    "Hospital",
 ]

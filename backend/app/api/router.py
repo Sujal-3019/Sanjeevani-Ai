@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.auth import router as auth_router
 from app.api.test_protected import router as test_protected_router
 from app.api.patient import router as patient_router
+from app.api.hospital import router as hospital_router
 from app.api.emergency_contacts import (
     router as emergency_contacts_router,
 )
@@ -35,4 +36,8 @@ router.include_router(
 router.include_router(
     emergency_contacts_router,
     prefix="/patient",
+)
+
+router.include_router(
+    hospital_router,
 )

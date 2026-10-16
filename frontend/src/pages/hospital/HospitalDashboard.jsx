@@ -1,863 +1,560 @@
-import React from 'react';
+
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     Activity,
     Ambulance,
-    Bell,
+    ArrowUpRight,
     Bed,
+    Building2,
     CheckCircle2,
     ChevronRight,
     Clock3,
-    Hospital,
-    LogOut,
+    Hospital as HospitalIcon,
     MapPin,
-    Menu,
-    Moon,
-    MoreHorizontal,
-    Phone,
+    RefreshCw,
+    ShieldAlert,
     ShieldCheck,
     Siren,
-    Sun,
-    UserRound,
     Users,
-    X,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import HospitalNavbar from '../../components/layout/HospitalNavbar';
-import { useTheme } from '../../context/ThemeContext';
-import logo from '../../assets/logo4.png';
+import { Link } from 'react-router-dom';
 
-const MOCK_HOSPITAL = {
-    name: 'Sanjeevani Emergency Hospital',
-    type: 'Multi-Specialty Hospital',
-    city: 'New Delhi',
-    state: 'Delhi',
-    status: 'PENDING',
-    applicationId: 'HSP-2026-00421',
+import HospitalNavbar from '../../components/layout/HospitalNavbar';
+import hospitalService from '../../services/hospitalService';
+
+const STATUS_CONFIG = {
+    VERIFIED: {
+        label: 'Verified',
+        tone: 'emerald',
+        icon: CheckCircle2,
+        description:
+            'Your hospital is verified. Emergency eligibility is confirmed by the backend.',
+    },
+    PENDING: {
+        label: 'Pending review',
+        tone: 'amber',
+        icon: Clock3,
+        description:
+            'Your hospital application is awaiting verification. Live emergency coordination is unavailable until approval.',
+    },
+    REJECTED: {
+        label: 'Verification rejected',
+        tone: 'red',
+        icon: ShieldAlert,
+        description:
+            'Review the rejection reason, update your hospital details, and resubmit for verification.',
+    },
 };
 
-const MOCK_STATS = [
-    {
-        label: 'Emergency requests',
-        value: '12',
-        helper: 'Today',
-        icon: Siren,
-        tone: 'danger',
-        path: '/dashboard/hospital/emergencies',
-    },
-    {
-        label: 'Active emergencies',
-        value: '3',
-        helper: 'Currently',
-        icon: Activity,
-        tone: 'warning',
-        path: '/dashboard/hospital/emergencies',
-    },
-    {
-        label: 'Available ambulances',
-        value: '5',
-        helper: 'of 8 total',
-        icon: Ambulance,
-        tone: 'primary',
-        path: '/dashboard/hospital/ambulances',
-    },
-    {
-        label: 'Available paramedics',
-        value: '9',
-        helper: 'of 14 total',
-        icon: Users,
-        tone: 'info',
-        path: '/dashboard/hospital/paramedics',
-    },
-];
+function StatusBadge({ status }) {
+    const config = STATUS_CONFIG[status] || {
+        label: status || 'Unknown',
+        tone: 'slate',
+        icon: ShieldAlert,
+    };
 
-const MOCK_EMERGENCIES = [
-    {
-        id: 'EM-2026-00131',
-        patient: 'Emergency request',
-        location: 'Connaught Place',
-        severity: 'CRITICAL',
-        time: '2 min ago',
-        status: 'Awaiting response',
-    },
-    {
-        id: 'EM-2026-00130',
-        patient: 'Emergency request',
-        location: 'Karol Bagh',
-        severity: 'HIGH',
-        time: '8 min ago',
-        status: 'Ambulance assigned',
-    },
-    {
-        id: 'EM-2026-00129',
-        patient: 'Emergency request',
-        location: 'Lajpat Nagar',
-        severity: 'MODERATE',
-        time: '18 min ago',
-        status: 'Patient transported',
-    },
-];
+    const Icon = config.icon;
 
-const MOCK_AMBULANCES = [
-    {
-        id: 'AMB-042',
-        type: 'ALS',
-        driver: 'Rohan Mehta',
-        status: 'On mission',
-        location: 'Connaught Place',
-    },
-    {
-        id: 'AMB-038',
-        type: 'BLS',
-        driver: 'Amit Kumar',
-        status: 'Available',
-        location: 'Hospital',
-    },
-    {
-        id: 'AMB-031',
-        type: 'ALS',
-        driver: 'Neeraj Singh',
-        status: 'Available',
-        location: 'Hospital',
-    },
-];
-
-const MOCK_ACTIVITY = [
-    {
-        icon: Ambulance,
-        title: 'Ambulance AMB-042 assigned',
-        description: 'Emergency EM-2026-00130',
-        time: '8 min ago',
-    },
-    {
-        icon: Users,
-        title: 'Paramedic Rohan Mehta accepted mission',
-        description: 'Emergency response initiated',
-        time: '9 min ago',
-    },
-    {
-        icon: Bell,
-        title: 'New emergency request received',
-        description: 'Location: Connaught Place',
-        time: '12 min ago',
-    },
-    {
-        icon: Bed,
-        title: 'Capacity information updated',
-        description: 'Emergency beds: 14 available',
-        time: '32 min ago',
-    },
-];
-
-const CAPACITY = [
-    {
-        label: 'Total beds',
-        available: 46,
-        total: 120,
-    },
-    {
-        label: 'Emergency beds',
-        available: 14,
-        total: 24,
-    },
-    {
-        label: 'ICU beds',
-        available: 6,
-        total: 18,
-    },
-    {
-        label: 'Ventilators',
-        available: 5,
-        total: 12,
-    },
-];
-
-const SERVICES = [
-    '24×7 Emergency',
-    'Trauma Care',
-    'ICU',
-    'NICU',
-    'Cardiology',
-    'Neurology',
-];
-
-
-function StatusBadge({ children, tone = 'success' }) {
-    const toneClasses = {
-        success:
+    const tones = {
+        emerald:
             'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-        warning:
-            'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-        danger: 'bg-red-500/10 text-red-600 dark:text-red-400',
-        info: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-        neutral: 'bg-(--sj-surface-2) text-(--sj-text-soft)',
+        amber:
+            'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+        red: 'bg-red-500/10 text-red-600 dark:text-red-400',
+        slate: 'bg-slate-500/10 text-slate-600 dark:text-slate-300',
     };
 
     return (
         <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] ${toneClasses[tone]}`}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${tones[config.tone]}`}
         >
-            <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                    tone === 'danger'
-                        ? 'bg-red-500'
-                        : tone === 'warning'
-                          ? 'bg-amber-500'
-                          : tone === 'info'
-                            ? 'bg-blue-500'
-                            : tone === 'success'
-                              ? 'bg-emerald-500'
-                              : 'bg-(--sj-text-muted)'
-                }`}
-            />
-
-            {children}
+            <Icon className="h-3.5 w-3.5" />
+            {config.label}
         </span>
     );
 }
 
-function HospitalDashboard() {
-    const navigate = useNavigate();
-    const { theme, toggleTheme } = useTheme();
+function StatCard({ label, value, helper, icon: Icon, to }) {
+    const content = (
+        <div className="sj-card h-full p-5 transition hover:border-(--sj-primary)/30">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="text-xs font-semibold text-(--sj-text-muted)">
+                        {label}
+                    </p>
+                    <p className="mt-3 text-3xl font-black tracking-tight text-(--sj-text)">
+                        {value}
+                    </p>
+                    <p className="mt-1 text-xs text-(--sj-text-soft)">
+                        {helper}
+                    </p>
+                </div>
 
-    const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-    const [notificationOpen, setNotificationOpen] = React.useState(false);
-    const [profileOpen, setProfileOpen] = React.useState(false);
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-(--sj-primary)/10 text-(--sj-primary)">
+                    <Icon className="h-5 w-5" />
+                </div>
+            </div>
 
-    const isDark = theme === 'dark';
+            {to && (
+                <div className="mt-4 flex items-center justify-between border-t border-(--sj-border) pt-3">
+                    <span className="text-xs font-bold text-(--sj-text-muted)">
+                        Manage
+                    </span>
+                    <ArrowUpRight className="h-4 w-4 text-(--sj-primary)" />
+                </div>
+            )}
+        </div>
+    );
 
-    const handleSignOut = () => {
-        window.location.href = '/';
-    };
+    return to ? (
+        <Link to={to} className="block">
+            {content}
+        </Link>
+    ) : (
+        content
+    );
+}
 
-    const getEmergencySeverityTone = (severity) => {
-        if (severity === 'CRITICAL') {
-            return 'danger';
-        }
-
-        if (severity === 'HIGH') {
-            return 'warning';
-        }
-
-        return 'info';
-    };
-
-    const getAmbulanceStatusTone = (status) => {
-        if (status === 'Available') {
-            return 'success';
-        }
-
-        if (status === 'On mission') {
-            return 'warning';
-        }
-
-        return 'neutral';
-    };
+function CapacityBar({ label, available, total }) {
+    const percentage =
+        total > 0
+            ? Math.min(100, Math.round((available / total) * 100))
+            : 0;
 
     return (
-        <div className="sanjeevani-page min-h-screen">
-            <HospitalNavbar/>
-
-            <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-                <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
-                    <div className="min-w-0">
-                        <div className="mb-6">
-                            <p className="text-xs font-black uppercase tracking-[0.18em] text-(--sj-primary)">
-                                Hospital command center
-                            </p>
-
-                            <div className="mt-2 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-                                <div>
-                                    <h1 className="text-3xl font-black tracking-[-0.035em] text-(--sj-text) sm:text-4xl">
-                                        Good afternoon, Admin
-                                    </h1>
-
-                                    <p className="mt-2 max-w-2xl text-sm leading-6 text-(--sj-text-soft)">
-                                        Monitor emergency requests, ambulance
-                                        operations and hospital capacity from
-                                        one place.
-                                    </p>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <span className="sj-live">
-                                        <span className="sj-live-dot" />
-
-                                        <span className="text-xs font-bold text-(--sj-text-soft)">
-                                            System operational
-                                        </span>
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {MOCK_HOSPITAL.status !== 'VERIFIED' && (
-                            <div className="mb-6 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 sm:p-5">
-                                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="flex items-start gap-3">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                                            <Clock3 className="h-5 w-5" />
-                                        </div>
-
-                                        <div>
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <h2 className="text-sm font-black text-(--sj-text)">
-                                                    Hospital verification pending
-                                                </h2>
-
-                                                <StatusBadge tone="warning">
-                                                    {MOCK_HOSPITAL.status}
-                                                </StatusBadge>
-                                            </div>
-
-                                            <p className="mt-1 max-w-2xl text-xs leading-5 text-(--sj-text-soft)">
-                                                Your hospital application is
-                                                being reviewed by the Sanjeevani
-                                                AI verification team. Live
-                                                emergency coordination will
-                                                become available after
-                                                verification.
-                                            </p>
-
-                                            <p className="mt-2 text-[11px] font-bold text-(--sj-text-muted)">
-                                                Application ID:{' '}
-                                                <span className="text-(--sj-text)">
-                                                    {
-                                                        MOCK_HOSPITAL.applicationId
-                                                    }
-                                                </span>
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <Link
-                                        to={`/verification/hospital?applicationId=${MOCK_HOSPITAL.applicationId}`}
-                                        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-500/20 bg-(--sj-surface) px-4 py-2.5 text-xs font-black text-(--sj-text) transition hover:border-amber-500/40 hover:text-amber-600 dark:hover:text-amber-400"
-                                    >
-                                        View status
-                                        <ChevronRight className="h-4 w-4" />
-                                    </Link>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Dashboard statistic navigation cards */}
-                        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                            {MOCK_STATS.map((stat) => {
-                                const Icon = stat.icon;
-
-                                const iconTone =
-                                    stat.tone === 'danger'
-                                        ? 'bg-red-500/10 text-red-500'
-                                        : stat.tone === 'warning'
-                                          ? 'bg-amber-500/10 text-amber-500'
-                                          : stat.tone === 'info'
-                                            ? 'bg-blue-500/10 text-blue-500'
-                                            : 'bg-(--sj-primary)/10 text-(--sj-primary)';
-
-                                return (
-                                    <Link
-                                        key={stat.label}
-                                        to={stat.path}
-                                        className="sj-card group block p-5 transition hover:-translate-y-0.5 hover:border-(--sj-primary)/30 hover:shadow-lg"
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <p className="text-xs font-bold text-(--sj-text-muted)">
-                                                    {stat.label}
-                                                </p>
-
-                                                <p className="mt-3 text-3xl font-black tracking-tight text-(--sj-text)">
-                                                    {stat.value}
-                                                </p>
-
-                                                <p className="mt-1 text-[11px] font-semibold text-(--sj-text-muted)">
-                                                    {stat.helper}
-                                                </p>
-                                            </div>
-
-                                            <div
-                                                className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconTone}`}
-                                            >
-                                                <Icon className="h-5 w-5" />
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-4 flex items-center justify-between border-t border-(--sj-border) pt-3">
-                                            <span className="text-[10px] font-bold text-(--sj-text-muted)">
-                                                Open module
-                                            </span>
-
-                                            <ChevronRight className="h-4 w-4 text-(--sj-text-muted) transition group-hover:translate-x-0.5 group-hover:text-(--sj-primary)" />
-                                        </div>
-                                    </Link>
-                                );
-                            })}
-                        </section>
-
-                        <section className="mt-6 grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-                            {/* Emergency requests */}
-                            <div className="sj-card overflow-hidden">
-                                <div className="flex items-center justify-between border-b border-(--sj-border) px-5 py-4">
-                                    <div>
-                                        <p className="text-sm font-black text-(--sj-text)">
-                                            Emergency requests
-                                        </p>
-
-                                        <p className="mt-1 text-xs text-(--sj-text-muted)">
-                                            Latest requests requiring hospital
-                                            attention
-                                        </p>
-                                    </div>
-
-                                    <Link
-                                        to="/dashboard/hospital/emergencies"
-                                        className="hidden items-center gap-1 text-xs font-black text-(--sj-primary) sm:inline-flex"
-                                    >
-                                        View all
-                                        <ChevronRight className="h-4 w-4" />
-                                    </Link>
-                                </div>
-
-                                <div className="divide-y divide-(--sj-border)">
-                                    {MOCK_EMERGENCIES.map((emergency) => (
-                                        <button
-                                            key={emergency.id}
-                                            type="button"
-                                            onClick={() =>
-                                                navigate(
-                                                    `/dashboard/hospital/emergencies/${emergency.id}`,
-                                                )
-                                            }
-                                            className="flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-(--sj-surface-2)"
-                                        >
-                                            <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-500 sm:flex">
-                                                <Siren className="h-5 w-5" />
-                                            </div>
-
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <p className="text-sm font-black text-(--sj-text)">
-                                                        {emergency.id}
-                                                    </p>
-
-                                                    <StatusBadge
-                                                        tone={getEmergencySeverityTone(
-                                                            emergency.severity,
-                                                        )}
-                                                    >
-                                                        {emergency.severity}
-                                                    </StatusBadge>
-                                                </div>
-
-                                                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-(--sj-text-muted)">
-                                                    <span className="inline-flex items-center gap-1">
-                                                        <MapPin className="h-3.5 w-3.5" />
-                                                        {emergency.location}
-                                                    </span>
-
-                                                    <span>
-                                                        {emergency.time}
-                                                    </span>
-                                                </div>
-
-                                                <p className="mt-2 text-xs font-bold text-(--sj-text-soft)">
-                                                    {emergency.status}
-                                                </p>
-                                            </div>
-
-                                            <ChevronRight className="h-4 w-4 shrink-0 text-(--sj-text-muted)" />
-                                        </button>
-                                    ))}
-                                </div>
-
-                                <div className="border-t border-(--sj-border) px-5 py-4 sm:hidden">
-                                    <Link
-                                        to="/dashboard/hospital/emergencies"
-                                        className="inline-flex items-center gap-1 text-xs font-black text-(--sj-primary)"
-                                    >
-                                        View all emergency requests
-                                        <ChevronRight className="h-4 w-4" />
-                                    </Link>
-                                </div>
-                            </div>
-
-                            {/* Capacity */}
-                            <Link
-                                to="/dashboard/hospital/capacity"
-                                className="sj-card group block p-5 transition hover:border-(--sj-primary)/30 hover:shadow-lg"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-black text-(--sj-text)">
-                                            Hospital capacity
-                                        </p>
-
-                                        <p className="mt-1 text-xs text-(--sj-text-muted)">
-                                            Current availability
-                                        </p>
-                                    </div>
-
-                                    <Bed className="h-5 w-5 text-(--sj-primary)" />
-                                </div>
-
-                                <div className="mt-6 space-y-5">
-                                    {CAPACITY.map((item) => {
-                                        const percentage = Math.round(
-                                            (item.available / item.total) * 100,
-                                        );
-
-                                        return (
-                                            <div key={item.label}>
-                                                <div className="mb-2 flex items-center justify-between">
-                                                    <span className="text-xs font-bold text-(--sj-text-soft)">
-                                                        {item.label}
-                                                    </span>
-
-                                                    <span className="text-xs font-black text-(--sj-text)">
-                                                        {item.available}/
-                                                        {item.total}
-                                                    </span>
-                                                </div>
-
-                                                <div className="h-2 overflow-hidden rounded-full bg-(--sj-surface-2)">
-                                                    <div
-                                                        className="h-full rounded-full bg-(--sj-primary)"
-                                                        style={{
-                                                            width: `${percentage}%`,
-                                                        }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                <div className="mt-6 flex items-center justify-between border-t border-(--sj-border) pt-4">
-                                    <span className="text-xs font-black text-(--sj-text-muted)">
-                                        Manage capacity
-                                    </span>
-
-                                    <ChevronRight className="h-4 w-4 text-(--sj-text-muted) transition group-hover:translate-x-0.5 group-hover:text-(--sj-primary)" />
-                                </div>
-                            </Link>
-                        </section>
-
-                        <section className="mt-6 grid gap-6 xl:grid-cols-2">
-                            {/* Ambulances */}
-                            <Link
-                                to="/dashboard/hospital/ambulances"
-                                className="sj-card group block overflow-hidden transition hover:border-(--sj-primary)/30 hover:shadow-lg"
-                            >
-                                <div className="flex items-center justify-between border-b border-(--sj-border) px-5 py-4">
-                                    <div>
-                                        <p className="text-sm font-black text-(--sj-text)">
-                                            Ambulance fleet
-                                        </p>
-
-                                        <p className="mt-1 text-xs text-(--sj-text-muted)">
-                                            Current ambulance operations
-                                        </p>
-                                    </div>
-
-                                    <span className="text-xs font-black text-(--sj-primary)">
-                                        Manage
-                                    </span>
-                                </div>
-
-                                <div className="divide-y divide-(--sj-border)">
-                                    {MOCK_AMBULANCES.map((ambulance) => (
-                                        <div
-                                            key={ambulance.id}
-                                            className="flex items-center gap-4 px-5 py-4"
-                                        >
-                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-(--sj-primary)/10 text-(--sj-primary)">
-                                                <Ambulance className="h-5 w-5" />
-                                            </div>
-
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <p className="text-sm font-black text-(--sj-text)">
-                                                        {ambulance.id}
-                                                    </p>
-
-                                                    <span className="rounded-md bg-(--sj-surface-2) px-1.5 py-0.5 text-[9px] font-black text-(--sj-text-muted)">
-                                                        {ambulance.type}
-                                                    </span>
-                                                </div>
-
-                                                <p className="mt-1 text-xs text-(--sj-text-muted)">
-                                                    {ambulance.driver} ·{' '}
-                                                    {ambulance.location}
-                                                </p>
-                                            </div>
-
-                                            <StatusBadge
-                                                tone={getAmbulanceStatusTone(
-                                                    ambulance.status,
-                                                )}
-                                            >
-                                                {ambulance.status}
-                                            </StatusBadge>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="flex items-center justify-between border-t border-(--sj-border) px-5 py-4">
-                                    <span className="text-xs font-black text-(--sj-text-muted)">
-                                        Open ambulance management
-                                    </span>
-
-                                    <ChevronRight className="h-4 w-4 text-(--sj-text-muted) transition group-hover:translate-x-0.5 group-hover:text-(--sj-primary)" />
-                                </div>
-                            </Link>
-
-                            {/* Activity */}
-                            <div className="sj-card overflow-hidden">
-                                <div className="flex items-center justify-between border-b border-(--sj-border) px-5 py-4">
-                                    <div>
-                                        <p className="text-sm font-black text-(--sj-text)">
-                                            Recent activity
-                                        </p>
-
-                                        <p className="mt-1 text-xs text-(--sj-text-muted)">
-                                            Latest operational events
-                                        </p>
-                                    </div>
-
-                                    <MoreHorizontal className="h-5 w-5 text-(--sj-text-muted)" />
-                                </div>
-
-                                <div className="divide-y divide-(--sj-border)">
-                                    {MOCK_ACTIVITY.map((item) => {
-                                        const Icon = item.icon;
-
-                                        return (
-                                            <div
-                                                key={`${item.title}-${item.time}`}
-                                                className="flex gap-3 px-5 py-4"
-                                            >
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-(--sj-surface-2) text-(--sj-text-soft)">
-                                                    <Icon className="h-4 w-4" />
-                                                </div>
-
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-xs font-black text-(--sj-text)">
-                                                        {item.title}
-                                                    </p>
-
-                                                    <p className="mt-1 text-[11px] leading-5 text-(--sj-text-muted)">
-                                                        {item.description}
-                                                    </p>
-
-                                                    <p className="mt-1 text-[10px] font-bold text-(--sj-text-muted)">
-                                                        {item.time}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </section>
-                    </div>
-
-                    <aside className="space-y-6">
-                        {/* Hospital profile card */}
-                        <Link
-                            to="/dashboard/hospital/settings"
-                            className="sj-card group block overflow-hidden transition hover:border-(--sj-primary)/30 hover:shadow-lg"
-                        >
-                            <div className="border-b border-(--sj-border) bg-(--sj-primary)/5 p-5">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-(--sj-primary)/10 text-(--sj-primary)">
-                                        <Hospital className="h-5 w-5" />
-                                    </div>
-
-                                    <StatusBadge tone="warning">
-                                        {MOCK_HOSPITAL.status}
-                                    </StatusBadge>
-                                </div>
-
-                                <h2 className="mt-4 text-lg font-black tracking-tight text-(--sj-text)">
-                                    {MOCK_HOSPITAL.name}
-                                </h2>
-
-                                <p className="mt-1 text-xs text-(--sj-text-muted)">
-                                    {MOCK_HOSPITAL.type}
-                                </p>
-
-                                <div className="mt-3 flex items-center gap-1.5 text-xs text-(--sj-text-soft)">
-                                    <MapPin className="h-3.5 w-3.5 text-(--sj-primary)" />
-                                    {MOCK_HOSPITAL.city},{' '}
-                                    {MOCK_HOSPITAL.state}
-                                </div>
-                            </div>
-
-                            <div className="p-5">
-                                <div>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-(--sj-text-muted)">
-                                        Application ID
-                                    </p>
-
-                                    <p className="mt-1 font-mono text-sm font-black text-(--sj-text)">
-                                        {MOCK_HOSPITAL.applicationId}
-                                    </p>
-                                </div>
-
-                                <div className="mt-4 flex items-center justify-between border-t border-(--sj-border) pt-4">
-                                    <span className="text-xs font-black text-(--sj-text-muted)">
-                                        Open hospital profile
-                                    </span>
-
-                                    <ChevronRight className="h-4 w-4 text-(--sj-text-muted) transition group-hover:translate-x-0.5 group-hover:text-(--sj-primary)" />
-                                </div>
-                            </div>
-                        </Link>
-
-                        {/* Verification */}
-                        <Link
-                            to={`/verification/hospital?applicationId=${MOCK_HOSPITAL.applicationId}`}
-                            className="sj-card group block p-5 transition hover:border-amber-500/30 hover:shadow-lg"
-                        >
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                                        <ShieldCheck className="h-5 w-5" />
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm font-black text-(--sj-text)">
-                                            Verification
-                                        </p>
-
-                                        <p className="mt-1 text-xs text-(--sj-text-muted)">
-                                            Hospital application status
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <ChevronRight className="h-4 w-4 text-(--sj-text-muted) transition group-hover:translate-x-0.5" />
-                            </div>
-
-                            <div className="mt-4 rounded-xl bg-amber-500/5 p-3">
-                                <p className="text-xs font-bold text-(--sj-text)">
-                                    Application under review
-                                </p>
-
-                                <p className="mt-1 text-[11px] leading-5 text-(--sj-text-soft)">
-                                    Live emergency coordination will become
-                                    available after hospital verification.
-                                </p>
-                            </div>
-                        </Link>
-
-                        {/* Services */}
-                        <Link
-                            to="/dashboard/hospital/services"
-                            className="sj-card group block p-5 transition hover:border-(--sj-primary)/30 hover:shadow-lg"
-                        >
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-black text-(--sj-text)">
-                                        Hospital services
-                                    </p>
-
-                                    <p className="mt-1 text-xs text-(--sj-text-muted)">
-                                        Registered emergency capabilities
-                                    </p>
-                                </div>
-
-                                <ChevronRight className="h-4 w-4 text-(--sj-text-muted) transition group-hover:translate-x-0.5 group-hover:text-(--sj-primary)" />
-                            </div>
-
-                            <div className="mt-5 flex flex-wrap gap-2">
-                                {SERVICES.map((service) => (
-                                    <span
-                                        key={service}
-                                        className="rounded-lg border border-(--sj-border) bg-(--sj-surface-2) px-2.5 py-1.5 text-[10px] font-bold text-(--sj-text-soft)"
-                                    >
-                                        {service}
-                                    </span>
-                                ))}
-                            </div>
-                        </Link>
-
-                        {/* Coordination */}
-                        <div className="sj-card p-5">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500">
-                                    <Phone className="h-5 w-5" />
-                                </div>
-
-                                <div>
-                                    <p className="text-sm font-black text-(--sj-text)">
-                                        Emergency coordination
-                                    </p>
-
-                                    <p className="mt-1 text-xs text-(--sj-text-muted)">
-                                        24×7 operational support
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="mt-4 rounded-xl bg-(--sj-surface-2) p-3">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-(--sj-text-muted)">
-                                    Hospital emergency line
-                                </p>
-
-                                <p className="mt-1 text-sm font-black text-(--sj-text)">
-                                    +91 11 4000 1122
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Capacity reminder */}
-                        <Link
-                            to="/dashboard/hospital/capacity"
-                            className="group block rounded-2xl border border-(--sj-primary)/15 bg-(--sj-primary)/5 p-5 transition hover:border-(--sj-primary)/30"
-                        >
-                            <div className="flex items-start gap-3">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-(--sj-primary)/10 text-(--sj-primary)">
-                                    <CheckCircle2 className="h-4 w-4" />
-                                </div>
-
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-black text-(--sj-text)">
-                                        Keep capacity updated
-                                    </p>
-
-                                    <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
-                                        Accurate bed, ICU and ambulance
-                                        availability helps Sanjeevani AI make
-                                        better emergency coordination
-                                        decisions.
-                                    </p>
-
-                                    <div className="mt-3 flex items-center gap-1 text-xs font-black text-(--sj-primary)">
-                                        Manage capacity
-                                        <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-                                    </div>
-                                </div>
-                            </div>
-                        </Link>
-                    </aside>
-                </div>
-            </main>
-
-            <footer className="border-t border-(--sj-border) px-4 py-6 sm:px-6 lg:px-8">
-                <div className="mx-auto flex max-w-[1600px] flex-col gap-2 text-xs text-(--sj-text-muted) sm:flex-row sm:items-center sm:justify-between">
-                    <p>
-                        Sanjeevani AI · Hospital command center
-                    </p>
-
-                    <p>
-                        Emergency coordination access is restricted to
-                        authorized hospital personnel.
-                    </p>
-                </div>
-            </footer>
+        <div>
+            <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-(--sj-text-soft)">
+                    {label}
+                </span>
+                <span className="text-sm font-black text-(--sj-text)">
+                    {available} / {total}
+                </span>
+            </div>
+
+            <div
+                className="h-2.5 overflow-hidden rounded-full bg-(--sj-surface-2)"
+                role="progressbar"
+                aria-label={`${label} available`}
+                aria-valuemin={0}
+                aria-valuemax={total}
+                aria-valuenow={available}
+            >
+                <div
+                    className="h-full rounded-full bg-(--sj-primary) transition-all duration-500"
+                    style={{ width: `${percentage}%` }}
+                />
+            </div>
+
+            <p className="mt-1 text-right text-xs text-(--sj-text-muted)">
+                {percentage}% available
+            </p>
         </div>
     );
 }
 
-export default HospitalDashboard;
+function LoadingState() {
+    return (
+        <div className="sanjeevani-page min-h-screen">
+            <HospitalNavbar />
+            <main className="mx-auto max-w-375 px-4 py-10 sm:px-6 lg:px-8">
+                <div className="sj-card flex min-h-64 flex-col items-center justify-center p-8 text-center">
+                    <RefreshCw className="h-8 w-8 animate-spin text-(--sj-primary)" />
+                    <h1 className="mt-4 text-lg font-black text-(--sj-text)">
+                        Loading hospital dashboard
+                    </h1>
+                    <p className="mt-2 text-sm text-(--sj-text-muted)">
+                        Fetching your hospital information securely.
+                    </p>
+                </div>
+            </main>
+        </div>
+    );
+}
+
+export default function HospitalDashboard() {
+    const [dashboard, setDashboard] = useState(null);
+    const [profile, setProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    const loadDashboard = useCallback(async () => {
+        setLoading(true);
+        setError('');
+
+        try {
+            const [dashboardData, profileData] = await Promise.all([
+                hospitalService.getDashboard(),
+                hospitalService.getProfile(),
+            ]);
+
+            setDashboard(dashboardData);
+            setProfile(profileData);
+        } catch (err) {
+            setDashboard(null);
+            setProfile(null);
+            setError(
+                err.message ||
+                    'Unable to load your hospital information. Please try again.',
+            );
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadDashboard();
+    }, [loadDashboard]);
+
+    if (loading) {
+        return <LoadingState />;
+    }
+
+    if (error) {
+        const profileMissing =
+            error.toLowerCase().includes('no hospital is registered');
+
+        return (
+            <div className="sanjeevani-page min-h-screen">
+                <HospitalNavbar />
+
+                <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+                    <div className="sj-card p-6 sm:p-8">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/10 text-red-500">
+                            <ShieldAlert className="h-6 w-6" />
+                        </div>
+
+                        <h1 className="mt-5 text-2xl font-black text-(--sj-text)">
+                            {profileMissing
+                                ? 'Complete your hospital profile'
+                                : 'Unable to load dashboard'}
+                        </h1>
+
+                        <p className="mt-2 text-sm leading-6 text-(--sj-text-soft)">
+                            {profileMissing
+                                ? 'Your Hospital Admin account is signed in, but no hospital profile is linked to it yet.'
+                                : error}
+                        </p>
+
+                        <div className="mt-6 flex flex-wrap gap-3">
+                            {profileMissing ? (
+                                <Link
+                                    to="/register/hospital/profile"
+                                    className="inline-flex items-center gap-2 rounded-xl bg-(--sj-primary) px-4 py-3 text-sm font-bold text-white"
+                                >
+                                    Set up hospital profile
+                                    <ChevronRight className="h-4 w-4" />
+                                </Link>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={loadDashboard}
+                                    className="inline-flex items-center gap-2 rounded-xl bg-(--sj-primary) px-4 py-3 text-sm font-bold text-white"
+                                >
+                                    <RefreshCw className="h-4 w-4" />
+                                    Try again
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </main>
+            </div>
+        );
+    }
+
+    const status = dashboard?.verification_status || 'PENDING';
+    const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG.PENDING;
+
+    const canReceiveEmergencies =
+        dashboard?.can_receive_emergencies === true;
+
+    const capacityItems = [
+        {
+            label: 'Total beds',
+            available: Number(dashboard?.available_beds ?? 0),
+            total: Number(dashboard?.total_beds ?? 0),
+        },
+        {
+            label: 'ICU beds',
+            available: Number(dashboard?.icu_beds ?? 0),
+            total: Number(dashboard?.icu_beds ?? 0),
+        },
+    ];
+
+    const firstName =
+        profile?.name?.trim() || dashboard?.hospital_name || 'Hospital Admin';
+
+    return (
+        <div className="sanjeevani-page min-h-screen">
+            <HospitalNavbar />
+
+            <main className="mx-auto max-w-375 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+                <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+                    <div>
+                        <p className="text-xs font-black uppercase tracking-[0.18em] text-(--sj-primary)">
+                            Hospital command center
+                        </p>
+
+                        <h1 className="mt-2 text-3xl font-black tracking-tight text-(--sj-text) sm:text-4xl">
+                            Welcome to your dashboard
+                        </h1>
+
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-(--sj-text-soft)">
+                            Manage hospital details, monitor capacity, and
+                            prepare for emergency coordination.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={loadDashboard}
+                        className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-(--sj-border) bg-(--sj-surface) px-4 py-2.5 text-sm font-bold text-(--sj-text) transition hover:border-(--sj-primary)/40 sm:self-auto"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                        Refresh data
+                    </button>
+                </div>
+
+                <section className="sj-card mb-6 overflow-hidden">
+                    <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+                        <div className="flex items-start gap-4">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-(--sj-primary)/10 text-(--sj-primary)">
+                                <Building2 className="h-7 w-7" />
+                            </div>
+
+                            <div className="min-w-0">
+                                <p className="text-xs font-bold uppercase tracking-wider text-(--sj-text-muted)">
+                                    Registered hospital
+                                </p>
+
+                                <h2 className="mt-1 wrap-break-words text-xl font-black text-(--sj-text) sm:text-2xl">
+                                    {dashboard?.hospital_name || profile?.name || 'Your hospital'}
+                                </h2>
+
+                                <p className="mt-2 flex items-center gap-1.5 text-sm text-(--sj-text-soft)">
+                                    <MapPin className="h-4 w-4 shrink-0 text-(--sj-primary)" />
+                                    {[profile?.city, profile?.state]
+                                        .filter(Boolean)
+                                        .join(', ') || 'Location not available'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <StatusBadge status={status} />
+                    </div>
+
+                    <div className="border-t border-(--sj-border) bg-(--sj-surface-2)/50 px-5 py-4 sm:px-6">
+                        <div className="flex items-start gap-3">
+                            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-(--sj-primary)" />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-(--sj-text)">
+                                    {statusConfig.label}
+                                </p>
+                                <p className="mt-1 text-sm leading-6 text-(--sj-text-soft)">
+                                    {statusConfig.description}
+                                </p>
+
+                                {status === 'REJECTED' &&
+                                    dashboard?.rejection_reason && (
+                                        <p className="mt-3 rounded-lg bg-red-500/5 p-3 text-sm text-red-600 dark:text-red-400">
+                                            <strong>Reason:</strong>{' '}
+                                            {dashboard.rejection_reason}
+                                        </p>
+                                    )}
+                            </div>
+
+                            <Link
+                                to="/verification/hospital"
+                                className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-(--sj-primary)"
+                            >
+                                Details
+                                <ChevronRight className="h-4 w-4" />
+                            </Link>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <StatCard
+                        label="Total beds"
+                        value={dashboard?.total_beds ?? '—'}
+                        helper="Registered capacity"
+                        icon={Bed}
+                        to="/dashboard/hospital/capacity"
+                    />
+
+                    <StatCard
+                        label="Available beds"
+                        value={dashboard?.available_beds ?? '—'}
+                        helper="Current reported availability"
+                        icon={Activity}
+                        to="/dashboard/hospital/capacity"
+                    />
+
+                    <StatCard
+                        label="ICU beds"
+                        value={dashboard?.icu_beds ?? '—'}
+                        helper="Reported ICU capacity"
+                        icon={HospitalIcon}
+                        to="/dashboard/hospital/capacity"
+                    />
+
+                    <StatCard
+                        label="Emergency access"
+                        value={canReceiveEmergencies ? 'Enabled' : 'Restricted'}
+                        helper={
+                            canReceiveEmergencies
+                                ? 'Hospital verification confirmed'
+                                : 'Requires hospital verification'
+                        }
+                        icon={canReceiveEmergencies ? CheckCircle2 : ShieldAlert}
+                    />
+                </section>
+
+                <section className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                    <div className="sj-card p-5 sm:p-6">
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <h2 className="text-lg font-black text-(--sj-text)">
+                                    Hospital capacity
+                                </h2>
+                                <p className="mt-1 text-sm text-(--sj-text-muted)">
+                                    Data reported by your hospital profile
+                                </p>
+                            </div>
+                            <Bed className="h-5 w-5 text-(--sj-primary)" />
+                        </div>
+
+                        <div className="mt-6 space-y-6">
+                            {capacityItems.map((item) => (
+                                <CapacityBar
+                                    key={item.label}
+                                    label={item.label}
+                                    available={item.available}
+                                    total={item.total}
+                                />
+                            ))}
+                        </div>
+
+                        <Link
+                            to="/dashboard/hospital/capacity"
+                            className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-(--sj-primary)"
+                        >
+                            Manage capacity
+                            <ChevronRight className="h-4 w-4" />
+                        </Link>
+                    </div>
+
+                    <div className="sj-card p-5 sm:p-6">
+                        <h2 className="text-lg font-black text-(--sj-text)">
+                            Quick actions
+                        </h2>
+                        <p className="mt-1 text-sm text-(--sj-text-muted)">
+                            Manage your hospital setup and operations.
+                        </p>
+
+                        <div className="mt-5 space-y-3">
+                            <Link
+                                to="/dashboard/hospital/settings"
+                                className="flex items-center gap-3 rounded-xl border border-(--sj-border) p-4 transition hover:border-(--sj-primary)/40 hover:bg-(--sj-surface-2)"
+                            >
+                                <Building2 className="h-5 w-5 text-(--sj-primary)" />
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-bold text-(--sj-text)">
+                                        Hospital profile
+                                    </span>
+                                    <span className="mt-1 block text-xs text-(--sj-text-muted)">
+                                        Review and update registered details
+                                    </span>
+                                </span>
+                                <ChevronRight className="h-4 w-4 text-(--sj-text-muted)" />
+                            </Link>
+
+                            <Link
+                                to="/dashboard/hospital/ambulances"
+                                className="flex items-center gap-3 rounded-xl border border-(--sj-border) p-4 transition hover:border-(--sj-primary)/40 hover:bg-(--sj-surface-2)"
+                            >
+                                <Ambulance className="h-5 w-5 text-(--sj-primary)" />
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-bold text-(--sj-text)">
+                                        Ambulance fleet
+                                    </span>
+                                    <span className="mt-1 block text-xs text-(--sj-text-muted)">
+                                        Open ambulance management
+                                    </span>
+                                </span>
+                                <ChevronRight className="h-4 w-4 text-(--sj-text-muted)" />
+                            </Link>
+
+                            <Link
+                                to="/dashboard/hospital/paramedics"
+                                className="flex items-center gap-3 rounded-xl border border-(--sj-border) p-4 transition hover:border-(--sj-primary)/40 hover:bg-(--sj-surface-2)"
+                            >
+                                <Users className="h-5 w-5 text-(--sj-primary)" />
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-bold text-(--sj-text)">
+                                        Paramedics
+                                    </span>
+                                    <span className="mt-1 block text-xs text-(--sj-text-muted)">
+                                        Open paramedic management
+                                    </span>
+                                </span>
+                                <ChevronRight className="h-4 w-4 text-(--sj-text-muted)" />
+                            </Link>
+
+                            <Link
+                                to="/dashboard/hospital/emergencies"
+                                onClick={(event) => {
+                                    if (!canReceiveEmergencies) {
+                                        event.preventDefault();
+                                    }
+                                }}
+                                aria-disabled={!canReceiveEmergencies}
+                                className={`flex items-center gap-3 rounded-xl border border-(--sj-border) p-4 ${
+                                    canReceiveEmergencies
+                                        ? 'transition hover:border-(--sj-primary)/40 hover:bg-(--sj-surface-2)'
+                                        : 'cursor-not-allowed opacity-50'
+                                }`}
+                            >
+                                <Siren className="h-5 w-5 text-(--sj-primary)" />
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-bold text-(--sj-text)">
+                                        Emergency requests
+                                    </span>
+                                    <span className="mt-1 block text-xs text-(--sj-text-muted)">
+                                        {canReceiveEmergencies
+                                            ? 'Open emergency coordination'
+                                            : 'Available after hospital verification'}
+                                    </span>
+                                </span>
+                                <ChevronRight className="h-4 w-4 text-(--sj-text-muted)" />
+                            </Link>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="mt-6 rounded-2xl border border-(--sj-border) bg-(--sj-surface-2)/50 p-5 sm:p-6">
+                    <div className="flex items-start gap-3">
+                        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-(--sj-primary)" />
+                        <div>
+                            <h2 className="text-sm font-black text-(--sj-text)">
+                                Accurate information matters
+                            </h2>
+                            <p className="mt-1 text-sm leading-6 text-(--sj-text-soft)">
+                                Keep your bed capacity and hospital profile
+                                current. Ambulance availability, paramedic
+                                counts, and live emergency statistics will be
+                                displayed here once their backend endpoints are
+                                connected.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <footer className="mt-8 border-t border-(--sj-border) py-5 text-xs text-(--sj-text-muted)">
+                    Sanjeevani AI · Hospital command center
+                </footer>
+            </main>
+        </div>
+    );
+}

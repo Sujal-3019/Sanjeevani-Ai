@@ -11,6 +11,10 @@ from app.models.sos_request import SOSRequest
 from app.models.user import User
 from app.models.hospital import Hospital
 
+from app.models.ambulance import Ambulance
+from app.models.ambulance_crew import AmbulanceCrew
+
+
 __all__ = [
     "PatientLocationUpdate",
     "EmergencyShareToken",
@@ -24,4 +28,6 @@ __all__ = [
     "SOSRequest",
     "EmergencyEvent",
     "Hospital",
+    "Ambulance",
+    "AmbulanceCrew",
 ]

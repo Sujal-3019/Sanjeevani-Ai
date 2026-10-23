@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
     Ambulance,
     ArrowLeft,
@@ -27,6 +27,7 @@ import { Link } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/logo4.png';
 import HospitalNavbar from '../../components/layout/HospitalNavbar';
+import ambulanceService from '../../services/ambulanceService';
 
 const CREW_ROLES = [
     'Paramedic',
@@ -34,159 +35,6 @@ const CREW_ROLES = [
     'Driver',
     'Nurse',
     'Other',
-];
-
-const INITIAL_AMBULANCES = [
-    {
-        id: 'AMB-038',
-        registrationNumber: 'DL-01-AB-4038',
-        type: 'BLS',
-        status: 'AVAILABLE',
-        location: 'Hospital Campus',
-        lastUpdated: 'Just now',
-        equipment: ['Oxygen', 'AED', 'Stretcher'],
-        notes: 'Ready for emergency dispatch.',
-        crew: [
-            {
-                id: 1,
-                name: 'Amit Kumar',
-                phone: '+91 98765 40123',
-                role: 'Paramedic',
-                qualification: 'EMT-P',
-                primary: true,
-            },
-            {
-                id: 2,
-                name: 'Suresh Yadav',
-                phone: '+91 98765 40382',
-                role: 'Driver',
-                qualification: 'Emergency Vehicle Driver',
-                primary: false,
-            },
-        ],
-    },
-    {
-        id: 'AMB-031',
-        registrationNumber: 'DL-01-AB-4031',
-        type: 'ALS',
-        status: 'AVAILABLE',
-        location: 'Connaught Place',
-        lastUpdated: '2 min ago',
-        equipment: ['Ventilator', 'Oxygen', 'AED'],
-        notes: 'Advanced life support equipped.',
-        crew: [
-            {
-                id: 1,
-                name: 'Neeraj Singh',
-                phone: '+91 98765 40231',
-                role: 'Paramedic',
-                qualification: 'EMT-P',
-                primary: true,
-            },
-            {
-                id: 2,
-                name: 'Rahul Verma',
-                phone: '+91 98765 40321',
-                role: 'EMT',
-                qualification: 'EMT-B',
-                primary: false,
-            },
-            {
-                id: 3,
-                name: 'Manoj Kumar',
-                phone: '+91 98765 40331',
-                role: 'Driver',
-                qualification: 'Emergency Vehicle Driver',
-                primary: false,
-            },
-        ],
-    },
-    {
-        id: 'AMB-047',
-        registrationNumber: 'DL-01-AB-4047',
-        type: 'ALS',
-        status: 'ON_MISSION',
-        location: 'Karol Bagh',
-        lastUpdated: '1 min ago',
-        equipment: ['Ventilator', 'Oxygen', 'AED'],
-        notes: 'Currently responding to EM-2026-00130.',
-        crew: [
-            {
-                id: 1,
-                name: 'Vikram Rao',
-                phone: '+91 98765 40477',
-                role: 'Paramedic',
-                qualification: 'EMT-P',
-                primary: true,
-            },
-            {
-                id: 2,
-                name: 'Rakesh Sharma',
-                phone: '+91 98765 40478',
-                role: 'EMT',
-                qualification: 'EMT-B',
-                primary: false,
-            },
-            {
-                id: 3,
-                name: 'Deepak Singh',
-                phone: '+91 98765 40479',
-                role: 'Driver',
-                qualification: 'Emergency Vehicle Driver',
-                primary: false,
-            },
-        ],
-    },
-    {
-        id: 'AMB-024',
-        registrationNumber: 'DL-01-AB-4024',
-        type: 'BLS',
-        status: 'ON_MISSION',
-        location: 'Lajpat Nagar',
-        lastUpdated: '3 min ago',
-        equipment: ['Oxygen', 'Stretcher'],
-        notes: 'Patient transport in progress.',
-        crew: [
-            {
-                id: 1,
-                name: 'Rohan Mehta',
-                phone: '+91 98765 40240',
-                role: 'Paramedic',
-                qualification: 'EMT-P',
-                primary: true,
-            },
-            {
-                id: 2,
-                name: 'Sanjay Kumar',
-                phone: '+91 98765 40241',
-                role: 'Driver',
-                qualification: 'Emergency Vehicle Driver',
-                primary: false,
-            },
-        ],
-    },
-    {
-        id: 'AMB-019',
-        registrationNumber: 'DL-01-AB-4019',
-        type: 'BLS',
-        status: 'MAINTENANCE',
-        location: 'Hospital Workshop',
-        lastUpdated: '25 min ago',
-        equipment: ['Oxygen', 'Stretcher'],
-        notes: 'Routine maintenance inspection.',
-        crew: [],
-    },
-    {
-        id: 'AMB-012',
-        registrationNumber: 'DL-01-AB-4012',
-        type: 'ALS',
-        status: 'OFFLINE',
-        location: 'Hospital Campus',
-        lastUpdated: '1 hr ago',
-        equipment: ['Ventilator', 'Oxygen', 'AED'],
-        notes: 'Temporarily unavailable.',
-        crew: [],
-    },
 ];
 
 const STATUS_OPTIONS = [
@@ -471,8 +319,10 @@ function NavigationIcon() {
 function Ambulances() {
     const { theme, toggleTheme } = useTheme();
 
-    const [ambulances, setAmbulances] =
-        React.useState(INITIAL_AMBULANCES);
+    const [ambulances, setAmbulances] = React.useState([]);
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [isSaving, setIsSaving] = React.useState(false);
+    const [loadError, setLoadError] = React.useState('');
 
     const [search, setSearch] = React.useState('');
     const [statusFilter, setStatusFilter] = React.useState('ALL');
@@ -523,6 +373,27 @@ function Ambulances() {
 
     const isDark = theme === 'dark';
 
+    const loadAmbulances = async () => {
+        setIsLoading(true);
+        setLoadError('');
+
+        try {
+            const result = await ambulanceService.list();
+            setAmbulances(Array.isArray(result) ? result : []);
+        } catch (error) {
+            setLoadError(
+                error.message ||
+                'Unable to load ambulances. Please check the backend and try again.',
+            );
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadAmbulances();
+    }, []);
+
     const stats = {
         total: ambulances.length,
         available: ambulances.filter(
@@ -541,13 +412,11 @@ function Ambulances() {
 
         const matchesSearch =
             !query ||
-            ambulance.id.toLowerCase().includes(query) ||
-            ambulance.registrationNumber
-                .toLowerCase()
-                .includes(query) ||
-            ambulance.location.toLowerCase().includes(query) ||
-            ambulance.crew.some((member) =>
-                member.name.toLowerCase().includes(query),
+            String(ambulance.id || '').toLowerCase().includes(query) ||
+            String(ambulance.registrationNumber || '').toLowerCase().includes(query) ||
+            String(ambulance.location || '').toLowerCase().includes(query) ||
+            (ambulance.crew || []).some((member) =>
+                String(member.name || '').toLowerCase().includes(query),
             );
 
         const matchesStatus =
@@ -706,47 +575,33 @@ function Ambulances() {
         }));
     };
 
-    const handleSave = (event) => {
+    const handleSave = async (event) => {
         event.preventDefault();
+        setActionMessage('');
 
-        if (
-            !formData.id.trim() ||
-            !formData.registrationNumber.trim()
-        ) {
-            setActionMessage(
-                'Ambulance ID and registration number are required.',
-            );
+        if (!formData.id.trim() || !formData.registrationNumber.trim()) {
+            setActionMessage('Ambulance ID and registration number are required.');
             return;
         }
 
         const crewCount = Number(formData.crewCount);
-
-        if (
-            !Number.isInteger(crewCount) ||
-            crewCount < 1 ||
-            crewCount > 10
-        ) {
-            setActionMessage(
-                'Crew members must be between 1 and 10.',
-            );
+        if (!Number.isInteger(crewCount) || crewCount < 1 || crewCount > 10) {
+            setActionMessage('Crew members must be between 1 and 10.');
             return;
         }
 
         if (formData.crew.length !== crewCount) {
-            setActionMessage(
-                'Please provide details for every crew member.',
-            );
+            setActionMessage('Please provide details for every crew member.');
             return;
         }
 
-        const incompleteCrewMember =
-            formData.crew.find(
-                (member) =>
-                    !member.name.trim() ||
-                    !member.phone.trim() ||
-                    !member.role ||
-                    !member.qualification.trim(),
-            );
+        const incompleteCrewMember = formData.crew.find(
+            (member) =>
+                !member.name.trim() ||
+                !member.phone.trim() ||
+                !member.role ||
+                !member.qualification.trim(),
+        );
 
         if (incompleteCrewMember) {
             setActionMessage(
@@ -756,115 +611,84 @@ function Ambulances() {
         }
 
         const primaryParamedic = formData.crew.find(
-            (member) =>
-                member.primary &&
-                member.role === 'Paramedic',
+            (member) => member.primary && member.role === 'Paramedic',
         );
 
         if (!primaryParamedic) {
-            setActionMessage(
-                'Please select one crew member as the primary paramedic.',
-            );
+            setActionMessage('Please select one crew member as the primary paramedic.');
             return;
         }
 
-        const equipment = formData.equipment
-            .split(',')
-            .map((item) => item.trim())
-            .filter(Boolean);
-
-        const normalizedCrew = formData.crew.map(
-            (member) => ({
-                ...member,
+        const payload = {
+            ambulance_code: formData.id.trim(),
+            registration_number: formData.registrationNumber.trim(),
+            ambulance_type: formData.type,
+            status: formData.status,
+            current_location: formData.location.trim() || 'Hospital Campus',
+            equipment: formData.equipment
+                .split(',')
+                .map((item) => item.trim())
+                .filter(Boolean),
+            notes: formData.notes.trim() || 'No operational notes added.',
+            crew: formData.crew.map((member) => ({
                 name: member.name.trim(),
                 phone: member.phone.trim(),
-                qualification:
-                    member.qualification.trim(),
-            }),
-        );
+                role: member.role,
+                qualification: member.qualification.trim(),
+                is_primary: Boolean(member.primary),
+            })),
+        };
 
-        if (editingAmbulance) {
-            setAmbulances((current) =>
-                current.map((ambulance) =>
-                    ambulance.id ===
-                    editingAmbulance.id
-                        ? {
-                              ...ambulance,
-                              id: formData.id.trim(),
-                              registrationNumber:
-                                  formData.registrationNumber.trim(),
-                              type: formData.type,
-                              status: formData.status,
-                              location:
-                                  formData.location.trim() ||
-                                  'Hospital Campus',
-                              equipment,
-                              notes:
-                                  formData.notes.trim() ||
-                                  'No operational notes added.',
-                              crew: normalizedCrew,
-                              lastUpdated: 'Just now',
-                          }
-                        : ambulance,
-                ),
-            );
+        setIsSaving(true);
+        try {
+            if (editingAmbulance) {
+                await ambulanceService.update(
+                    editingAmbulance.recordId ?? editingAmbulance.id,
+                    payload,
+                );
+                setActionMessage(`${formData.id.trim()} details have been updated.`);
+            } else {
+                await ambulanceService.create(payload);
+                setActionMessage(`${formData.id.trim()} has been added to the ambulance fleet.`);
+            }
 
+            closeModal();
+            await loadAmbulances();
+        } catch (error) {
             setActionMessage(
-                `${formData.id.trim()} details have been updated.`,
+                error.message ||
+                'Could not save the ambulance. Please check the backend and try again.',
             );
-        } else {
-            const newAmbulance = {
-                id: formData.id.trim(),
-                registrationNumber:
-                    formData.registrationNumber.trim(),
-                type: formData.type,
-                status: formData.status,
-                location:
-                    formData.location.trim() ||
-                    'Hospital Campus',
-                lastUpdated: 'Just now',
-                equipment,
-                notes:
-                    formData.notes.trim() ||
-                    'No operational notes added.',
-                crew: normalizedCrew,
-            };
-
-            setAmbulances((current) => [
-                newAmbulance,
-                ...current,
-            ]);
-
-            setActionMessage(
-                `${newAmbulance.id} has been added to the ambulance fleet.`,
-            );
+        } finally {
+            setIsSaving(false);
         }
-
-        closeModal();
     };
 
-    const handleDelete = () => {
+    const handleDelete = async () => {
         if (!editingAmbulance) return;
 
         const confirmed = window.confirm(
             `Remove ${editingAmbulance.id} from the hospital fleet?`,
         );
-
         if (!confirmed) return;
 
-        setAmbulances((current) =>
-            current.filter(
-                (ambulance) =>
-                    ambulance.id !==
-                    editingAmbulance.id,
-            ),
-        );
-
-        setActionMessage(
-            `${editingAmbulance.id} has been removed from the fleet.`,
-        );
-
-        closeModal();
+        setIsSaving(true);
+        setActionMessage('');
+        try {
+            await ambulanceService.remove(
+                editingAmbulance.recordId ?? editingAmbulance.id,
+            );
+            setActionMessage(`${editingAmbulance.id} has been removed from the fleet.`);
+            closeModal();
+            await loadAmbulances();
+        } catch (error) {
+            setActionMessage(
+                error.message ||
+                'Could not remove the ambulance. Please try again.',
+            );
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const clearFilters = () => {
@@ -918,7 +742,8 @@ function Ambulances() {
                         <button
                             type="button"
                             onClick={openAddModal}
-                            className="sj-ai-button h-11 px-5 text-xs"
+                            disabled={isLoading || isSaving}
+                            className="sj-ai-button h-11 px-5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <Plus className="h-4 w-4" />
                             Add ambulance
@@ -947,6 +772,31 @@ function Ambulances() {
                     </div>
                 )}
 
+                {loadError && (
+                    <div className="mb-5 rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
+                        <p className="text-sm font-black text-red-600 dark:text-red-400">
+                            Could not load the ambulance fleet
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-(--sj-text-soft)">
+                            {loadError}
+                        </p>
+                        <button
+                            type="button"
+                            onClick={loadAmbulances}
+                            className="mt-3 rounded-lg border border-(--sj-border) px-3 py-2 text-xs font-bold text-(--sj-text)"
+                        >
+                            Try again
+                        </button>
+                    </div>
+                )}
+
+                {isLoading ? (
+                    <div className="sj-card flex items-center justify-center gap-3 p-12 text-sm font-bold text-(--sj-text-soft)">
+                        <span className="h-5 w-5 animate-spin rounded-full border-2 border-(--sj-primary)/30 border-t-(--sj-primary)" />
+                        Loading ambulance fleet...
+                    </div>
+                ) : (
+                <>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <StatCard
                         icon={Ambulance}
@@ -1247,6 +1097,8 @@ function Ambulances() {
                         </div>
                     </div>
                 </section>
+                </>
+                )}
             </main>
 
             <footer className="border-t border-(--sj-border) px-4 py-6 sm:px-6 lg:px-8">
@@ -1663,6 +1515,7 @@ function Ambulances() {
                                             onClick={
                                                 handleDelete
                                             }
+                                            disabled={isSaving}
                                             className="h-11 rounded-xl px-4 text-xs font-black text-red-500 hover:bg-red-500/5"
                                         >
                                             Remove ambulance
@@ -1674,6 +1527,7 @@ function Ambulances() {
                                     <button
                                         type="button"
                                         onClick={closeModal}
+                                        disabled={isSaving}
                                         className="h-11 rounded-xl border border-(--sj-border) px-5 text-xs font-black text-(--sj-text-soft) hover:text-(--sj-text)"
                                     >
                                         Cancel
@@ -1681,12 +1535,13 @@ function Ambulances() {
 
                                     <button
                                         type="submit"
-                                        className="sj-ai-button h-11 px-5 text-xs"
+                                        disabled={isSaving}
+                                        className="sj-ai-button h-11 px-5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         <CheckCircle2 className="h-4 w-4" />
                                         {editingAmbulance
-                                            ? 'Save changes'
-                                            : 'Add ambulance'}
+                                            ? (isSaving ? 'Saving...' : 'Save changes')
+                                            : (isSaving ? 'Adding...' : 'Add ambulance')}
                                     </button>
                                 </div>
                             </div>

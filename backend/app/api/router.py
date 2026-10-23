@@ -7,6 +7,8 @@ from app.api.hospital import router as hospital_router
 from app.api.emergency_contacts import (
     router as emergency_contacts_router,
 )
+from app.api.ambulance import router as ambulance_router
+
 
 router = APIRouter()
 
@@ -41,3 +43,7 @@ router.include_router(
 router.include_router(
     hospital_router,
 )
+
+router.include_router(
+    ambulance_router,
+    )
